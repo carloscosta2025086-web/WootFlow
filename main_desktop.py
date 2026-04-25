@@ -31,14 +31,45 @@ else:
     _BASE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(_BASE)
 
-# Log de diagnóstico — escreve ao lado do exe ou do script
-_LOG_PATH = os.path.join(_BASE, "wootflow_debug.log")
-logging.basicConfig(
-    filename=_LOG_PATH,
-    level=logging.DEBUG,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    encoding="utf-8",
-)
+def _resolve_log_path() -> str:
+    """Escolhe um caminho de log gravável (evita Program Files)."""
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    candidates = []
+
+    if local_appdata:
+        candidates.append(os.path.join(local_appdata, "WootFlow", "logs", "wootflow_debug.log"))
+
+    candidates.append(os.path.join(_BASE, "wootflow_debug.log"))
+    candidates.append(os.path.join(tempfile.gettempdir(), "wootflow_debug.log"))
+
+    for path in candidates:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8"):
+                pass
+            return path
+        except Exception:
+            continue
+
+    return os.path.join(tempfile.gettempdir(), "wootflow_debug.log")
+
+
+_LOG_PATH = _resolve_log_path()
+try:
+    logging.basicConfig(
+        filename=_LOG_PATH,
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        encoding="utf-8",
+    )
+except Exception:
+    _LOG_PATH = os.path.join(tempfile.gettempdir(), "wootflow_debug.log")
+    logging.basicConfig(
+        filename=_LOG_PATH,
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        encoding="utf-8",
+    )
 _log = logging.getLogger("main_desktop")
 _log.info("=== WootFlow startup ===")
 _log.info("BASE=%s", _BASE)
