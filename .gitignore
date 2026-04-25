@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+
+# Build
+build/
+dist/*.log
+build_log.txt
+
+# Debug logs
+*.log
+wootflow_debug.log
+
+# OS
+.DS_Store
+Thumbs.db
