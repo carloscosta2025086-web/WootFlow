@@ -1,10 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { AppState, AudioData, FrameData } from "../types";
 
-// Always use the fixed backend address — in dev and in the packaged app
-const WS_URL = "ws://127.0.0.1:9120/ws";
+function getWsCandidates(): string[] {
+  const candidates = new Set<string>();
+
+  if (typeof window !== "undefined") {
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    if (window.location.host) {
+      candidates.add(`${scheme}://${window.location.host}/ws`);
+    }
+  }
+
+  candidates.add("ws://127.0.0.1:9120/ws");
+  candidates.add("ws://localhost:9120/ws");
+  return Array.from(candidates);
+}
 
 const RECONNECT_DELAY = 2000;
+const CONNECT_TIMEOUT = 5000;
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -14,14 +27,35 @@ export function useWebSocket() {
   const frameRef = useRef<Record<string, number[]>>({});
   const [connected, setConnected] = useState(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const connectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const endpointIndex = useRef(0);
+  const wsCandidates = useRef<string[]>(getWsCandidates());
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) {
+      return;
+    }
 
-    const ws = new WebSocket(WS_URL);
+    const urls = wsCandidates.current;
+    const wsUrl = urls[endpointIndex.current % urls.length];
+
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => setConnected(true);
+    clearTimeout(connectTimer.current);
+    connectTimer.current = setTimeout(() => {
+      if (ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    }, CONNECT_TIMEOUT);
+
+    ws.onopen = () => {
+      clearTimeout(connectTimer.current);
+      setConnected(true);
+    };
 
     ws.onmessage = (ev) => {
       try {
@@ -55,7 +89,10 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
+      clearTimeout(connectTimer.current);
       setConnected(false);
+      endpointIndex.current = (endpointIndex.current + 1) % wsCandidates.current.length;
+      clearTimeout(reconnectTimer.current);
       reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
     };
 
@@ -65,6 +102,7 @@ export function useWebSocket() {
   useEffect(() => {
     connect();
     return () => {
+      clearTimeout(connectTimer.current);
       clearTimeout(reconnectTimer.current);
       wsRef.current?.close();
     };

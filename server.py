@@ -169,36 +169,55 @@ def _get_vk(key) -> int | None:
 # Settings persistence
 # ============================================================================
 _base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-_settings_path = os.path.join(
-    os.path.dirname(os.path.abspath(sys.argv[0])) if getattr(sys, "frozen", False)
-    else os.path.dirname(os.path.abspath(__file__)),
-    "rgb_settings.json",
+_runtime_base_dir = (
+    os.path.dirname(os.path.abspath(sys.argv[0]))
+    if getattr(sys, "frozen", False)
+    else os.path.dirname(os.path.abspath(__file__))
 )
 
 
-def _resolve_settings_path() -> str:
-    base_dir = (
-        os.path.dirname(os.path.abspath(sys.argv[0]))
-        if getattr(sys, "frozen", False)
-        else os.path.dirname(os.path.abspath(__file__))
-    )
-    candidates = [
-        os.path.join(base_dir, "config", "rgb_settings.json"),
-        os.path.join(base_dir, "rgb_settings.json"),
+def _resolve_settings_paths() -> tuple[str, list[str]]:
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    user_dir = os.path.join(local_appdata or _runtime_base_dir, "WootFlow")
+    user_path = os.path.join(user_dir, "rgb_settings.json")
+
+    # Legacy locations from older builds/installations.
+    legacy_paths = [
+        os.path.join(_runtime_base_dir, "config", "rgb_settings.json"),
+        os.path.join(_runtime_base_dir, "rgb_settings.json"),
     ]
-    for path in candidates:
-        if os.path.exists(path):
-            return path
-    return candidates[0]
+    return user_path, legacy_paths
 
 
-_settings_path = _resolve_settings_path()
+_settings_path, _legacy_settings_paths = _resolve_settings_paths()
+
+
+def _migrate_legacy_settings_if_needed():
+    if os.path.exists(_settings_path):
+        return
+
+    for old_path in _legacy_settings_paths:
+        if not os.path.exists(old_path):
+            continue
+        try:
+            os.makedirs(os.path.dirname(_settings_path), exist_ok=True)
+            with open(old_path, "r", encoding="utf-8") as src:
+                payload = json.load(src)
+            with open(_settings_path, "w", encoding="utf-8") as dst:
+                json.dump(payload, dst, indent=2)
+            log.info("Migrated settings from %s to %s", old_path, _settings_path)
+            return
+        except Exception as e:
+            log.warning("Could not migrate settings from %s: %s", old_path, e)
+
+
+_migrate_legacy_settings_if_needed()
 
 def _load_settings() -> dict:
     """Load user settings from disk."""
     try:
         if os.path.exists(_settings_path):
-            with open(_settings_path, "r") as f:
+            with open(_settings_path, "r", encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
         log.warning("Could not load settings: %s", e)
@@ -207,7 +226,8 @@ def _load_settings() -> dict:
 def _save_settings(data: dict):
     """Save user settings to disk."""
     try:
-        with open(_settings_path, "w") as f:
+        os.makedirs(os.path.dirname(_settings_path), exist_ok=True)
+        with open(_settings_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
     except Exception as e:
         log.warning("Could not save settings: %s", e)
@@ -663,6 +683,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+async def health_check():
+    """Health endpoint usado pelo launcher para validar readiness local."""
+    return {
+        "ok": True,
+        "service": "WootFlow",
+        "websocket": "/ws",
+        "connected": state.connected,
+    }
 
 
 # ── WebSocket (must be registered BEFORE static files mount) ──

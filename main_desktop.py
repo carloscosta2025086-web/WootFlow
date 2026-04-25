@@ -101,25 +101,35 @@ def _start_server():
 
 
 def _wait_for_server(timeout: float = 10.0):
-    """Espera até o server responder."""
-    import urllib.request
+    """Espera até o servidor local responder com health válido."""
     t0 = time.time()
     while time.time() - t0 < timeout:
         try:
-            urllib.request.urlopen("http://127.0.0.1:9120/ws", timeout=1)
+            req = urllib.request.Request(
+                "http://127.0.0.1:9120/health",
+                headers={"Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            if payload.get("ok") and payload.get("service") == "WootFlow":
+                return True
         except Exception:
-            # Any response (even 4xx) means server is up
-            # Only ConnectionRefused means not ready yet
-            try:
-                import urllib.error
-                urllib.request.urlopen("http://127.0.0.1:9120/", timeout=1)
-                return True
-            except urllib.error.URLError:
-                time.sleep(0.2)
-                continue
-            except Exception:
-                return True
+            time.sleep(0.25)
+            continue
     return False
+
+
+def _show_server_start_error() -> None:
+    msg = (
+        "O servidor local do WootFlow nao arrancou corretamente.\n\n"
+        "Isto normalmente acontece quando:\n"
+        "- a porta 9120 esta ocupada por outro processo, ou\n"
+        "- faltam dependencias/runtime.\n\n"
+        "Verifica o log em:\n"
+        f"{_LOG_PATH}\n"
+    )
+    _log.error("Server health check failed after timeout; aborting UI startup")
+    _message_box("WootFlow - Erro de arranque", msg, 0x00000010)
 
 
 def _cleanup_sdk():
@@ -480,8 +490,10 @@ def main():
     server_thread = threading.Thread(target=_start_server, daemon=True)
     server_thread.start()
 
-    # Wait for server to be ready
-    _wait_for_server()
+    # Wait for server to be ready with explicit health validation.
+    if not _wait_for_server(timeout=20.0):
+        _show_server_start_error()
+        return
 
     # Open native window
     window = webview.create_window(
