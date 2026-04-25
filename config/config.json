@@ -1,3 +1,5 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d385aceb108983b4354733521d51d878384c82495348c63abb74990c148ffc11
-size 98
+{
+    "check_interval": 5,
+    "idle_effect": "breathing",
+    "idle_color": [0, 200, 200]
+}

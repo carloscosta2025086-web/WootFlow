@@ -1,3 +1,4 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:e3426dff3e0429e13c564609eb804e2aefe9483cc430991aa8b520b4d1d4592e
-size 107
+# Do not enable Git LFS globally.
+# Keep repository metadata as regular text.
+.gitattributes !filter !diff !merge text eol=lf
+.gitignore !filter !diff !merge text eol=lf

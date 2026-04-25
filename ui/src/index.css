@@ -1,3 +1,74 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:c368f75060b34b6bbb81b5186c3f845af77c7b996b12752f50022134c3eb460e
-size 1514
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ── */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #e0e0e8;
+  background: #0a0a0f;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* ── Custom scrollbar ── */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #2e2e40;
+  border-radius: 3px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3e3e55;
+}
+
+/* ── Range slider ── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #242432;
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #00ffc8;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #0a0a0f;
+  box-shadow: 0 0 8px rgba(0, 255, 200, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(0, 255, 200, 0.5);
+}
+
+/* ── Number input ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.5;
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(0, 255, 200, 0.2);
+  color: white;
+}

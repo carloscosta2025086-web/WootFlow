@@ -1,3 +1,38 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ce3848bad73605a52d8db14abd1142a419108e22835ebb3700eb5fd806f566af
-size 1473
+# -*- mode: python ; coding: utf-8 -*-
+
+
+a = Analysis(
+    ['main_desktop.py'],
+    pathex=[],
+    binaries=[],
+    datas=[('sdk', 'sdk'), ('config/config.json', '.'), ('config/rgb_settings.json', 'config'), ('ui/dist', 'ui/dist'), ('profiles', 'profiles')],
+    hiddenimports=['uvicorn.logging', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'uvicorn.lifespan.off', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.http.h11_impl', 'uvicorn.protocols.http.httptools_impl', 'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto', 'uvicorn.protocols.websockets.websockets_impl', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.loops.asyncio', 'webview', 'clr_loader', 'pythonnet', 'bottle', 'pyaudiowpatch', 'pystray', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'screen_ambience', 'screen_ambience_profile', 'mss', 'numpy'],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='WootingRGB',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,  # <--- NÃO mostra janela preta/cmd
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)

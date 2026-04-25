@@ -1,3 +1,851 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d16f7e24e21cbe1e996ceb3460a57e215998bb3b762d2cfca04b0020c89cac4b
-size 28408
+"""
+Backend WebSocket server para a UI React do Wooting RGB.
+FastAPI + WebSocket — controla efeitos, áudio reativo, cores per-key.
+"""
+
+import asyncio
+import atexit
+import json
+import logging
+import os
+import signal
+import sys
+import threading
+import time
+import traceback
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+
+log = logging.getLogger("wooting")
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+
+# ── Imports do projecto ──
+from wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from effects_engine import (
+    EFFECTS, EFFECT_NAMES, EqualizerEffect, ALL_KEYS,
+    scale_color, PHYSICAL_KEYS_60HE, EQ_COLUMNS,
+)
+from audio_reactive import AudioReactive
+
+try:
+    from screen_ambience_profile import load_ambience_profile
+    HAS_SCREEN_AMBIENCE = True
+except Exception:
+    HAS_SCREEN_AMBIENCE = False
+
+
+# ============================================================================
+# Tracked keyboard — intercepts colors for UI preview
+# ============================================================================
+class TrackedKeyboard:
+    """Wrapper around WootingRGB that captures the color buffer for UI."""
+
+    def __init__(self, kb: WootingRGB):
+        self._kb = kb
+        # Frame buffer: row → col → (r, g, b)
+        self.frame: list[list[tuple[int, int, int]]] = [
+            [(0, 0, 0)] * WOOTING_RGB_COLS for _ in range(WOOTING_RGB_ROWS)
+        ]
+
+    def array_set_single(self, row: int, col: int, r: int, g: int, b: int) -> bool:
+        if 0 <= row < WOOTING_RGB_ROWS and 0 <= col < WOOTING_RGB_COLS:
+            self.frame[row][col] = (r, g, b)
+        return self._kb.array_set_single(row, col, r, g, b)
+
+    def array_update(self) -> bool:
+        return self._kb.array_update()
+
+    def __getattr__(self, name):
+        return getattr(self._kb, name)
+
+# ── pynput para captura de teclado (reactive typing / ripple) ──
+try:
+    from pynput import keyboard as pynput_kb
+    HAS_PYNPUT = True
+except ImportError:
+    HAS_PYNPUT = False
+
+try:
+    import ctypes
+    HAS_CTYPES = True
+except Exception:
+    HAS_CTYPES = False
+
+
+# ============================================================================
+# Scancode → SDK (row, col) para ISO PT 60HE
+# ============================================================================
+# pynput devolve Key ou KeyCode. Mapeamos vk (virtual key) e Key enums
+# para posições físicas no SDK.
+
+VK_TO_SDK = {
+    # Row 1 — Number row
+    0x1B: (1, 0),   # Escape
+    0x31: (1, 1),   # 1
+    0x32: (1, 2),   # 2
+    0x33: (1, 3),   # 3
+    0x34: (1, 4),   # 4
+    0x35: (1, 5),   # 5
+    0x36: (1, 6),   # 6
+    0x37: (1, 7),   # 7
+    0x38: (1, 8),   # 8
+    0x39: (1, 9),   # 9
+    0x30: (1, 10),  # 0
+    0xBD: (1, 11),  # -
+    0xBB: (1, 12),  # =
+    0x08: (1, 13),  # Backspace
+
+    # Row 2 — QWERTY
+    0x09: (2, 0),   # Tab
+    0x51: (2, 1),   # Q
+    0x57: (2, 2),   # W
+    0x45: (2, 3),   # E
+    0x52: (2, 4),   # R
+    0x54: (2, 5),   # T
+    0x59: (2, 6),   # Y
+    0x55: (2, 7),   # U
+    0x49: (2, 8),   # I
+    0x4F: (2, 9),   # O
+    0x50: (2, 10),  # P
+    0xDB: (2, 11),  # [
+    0xDD: (2, 12),  # ]
+    0xDC: (2, 13),  # \ (ISO: right of ])
+
+    # Row 3 — Home row
+    0x14: (3, 0),   # CapsLock
+    0x41: (3, 1),   # A
+    0x53: (3, 2),   # S
+    0x44: (3, 3),   # D
+    0x46: (3, 4),   # F
+    0x47: (3, 5),   # G
+    0x48: (3, 6),   # H
+    0x4A: (3, 7),   # J
+    0x4B: (3, 8),   # K
+    0x4C: (3, 9),   # L
+    0xBA: (3, 10),  # ; (Ç on PT)
+    0xDE: (3, 11),  # ' (º on PT)
+    0xC0: (3, 12),  # ` / ~ (« on PT)
+    0x0D: (3, 13),  # Enter
+
+    # Row 4 — Shift row (ISO: col 1 = <, Z at col 2)
+    0xA0: (4, 0),   # LShift
+    0xE2: (4, 1),   # OEM_102 = ISO < key
+    0x5A: (4, 2),   # Z
+    0x58: (4, 3),   # X
+    0x43: (4, 4),   # C
+    0x56: (4, 5),   # V
+    0x42: (4, 6),   # B
+    0x4E: (4, 7),   # N
+    0x4D: (4, 8),   # M
+    0xBC: (4, 9),   # ,
+    0xBE: (4, 10),  # .
+    0xBF: (4, 11),  # /
+    0xA1: (4, 13),  # RShift
+
+    # Row 5 — Bottom row
+    0xA2: (5, 0),   # LCtrl
+    0x5B: (5, 1),   # LWin
+    0xA4: (5, 2),   # LAlt
+    0x20: (5, 6),   # Space
+    0xA5: (5, 10),  # RAlt
+    0x5D: (5, 11),  # Menu/Apps
+    0xA3: (5, 12),  # RCtrl
+}
+
+
+def _get_vk(key) -> int | None:
+    """Extrai virtual key code de um evento pynput."""
+    if hasattr(key, "vk") and key.vk is not None:
+        return key.vk
+    if hasattr(key, "value") and hasattr(key.value, "vk"):
+        return key.value.vk
+    return None
+
+
+# ============================================================================
+# Settings persistence
+# ============================================================================
+_base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+_settings_path = os.path.join(
+    os.path.dirname(os.path.abspath(sys.argv[0])) if getattr(sys, "frozen", False)
+    else os.path.dirname(os.path.abspath(__file__)),
+    "rgb_settings.json",
+)
+
+
+def _resolve_settings_path() -> str:
+    base_dir = (
+        os.path.dirname(os.path.abspath(sys.argv[0]))
+        if getattr(sys, "frozen", False)
+        else os.path.dirname(os.path.abspath(__file__))
+    )
+    candidates = [
+        os.path.join(base_dir, "config", "rgb_settings.json"),
+        os.path.join(base_dir, "rgb_settings.json"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return candidates[0]
+
+
+_settings_path = _resolve_settings_path()
+
+def _load_settings() -> dict:
+    """Load user settings from disk."""
+    try:
+        if os.path.exists(_settings_path):
+            with open(_settings_path, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        log.warning("Could not load settings: %s", e)
+    return {}
+
+def _save_settings(data: dict):
+    """Save user settings to disk."""
+    try:
+        with open(_settings_path, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        log.warning("Could not save settings: %s", e)
+
+
+# ============================================================================
+# Application state
+# ============================================================================
+class AppState:
+    """Mantém o estado global da aplicação."""
+
+    def __init__(self):
+        self.kb = None          # WootingRGB (raw)
+        self.tracked_kb = None  # TrackedKeyboard wrapper
+        self.connected = False
+        self.running = False
+        self.frame_colors: dict[str, list[int]] = {}  # "row-col" → [r,g,b]
+        self._prev_frame: dict[str, list[int]] = {}   # previous frame for delta
+        self._device_info: dict | None = None
+
+        # Efeito actual
+        self.mode = "effect"    # "effect" | "audio" | "perkey" | "off"
+        self.current_effect_name = "breathing"
+        self.current_effect = None
+
+        # Audio
+        self.audio = AudioReactive()
+        self.audio_running = False
+        self.eq_effect = EqualizerEffect()
+
+        # Per-key colors (6 rows x 21 cols)
+        self.perkey_colors = [
+            [(0, 0, 0)] * WOOTING_RGB_COLS for _ in range(WOOTING_RGB_ROWS)
+        ]
+
+        # Effect params
+        self.brightness = 1.0
+        self.speed = 1.0
+        self.color1 = (0, 255, 200)
+        self.color2 = (255, 0, 100)
+
+        # Keyboard input listener (pynput)
+        self._kb_listener = None
+
+        self.input_caps = False
+
+        # WebSocket clients
+        self.clients: set[WebSocket] = set()
+        self._thread = None
+
+        # Screen ambience profile (optional)
+        self.screen_ambience = None
+
+        # Load saved settings
+        self._load_user_settings()
+
+    def _load_user_settings(self):
+        """Restore settings from disk."""
+        s = _load_settings()
+        if not s:
+            return
+        self.brightness = s.get("brightness", self.brightness)
+        self.speed = s.get("speed", self.speed)
+        self.color1 = tuple(s.get("color1", list(self.color1)))
+        self.color2 = tuple(s.get("color2", list(self.color2)))
+        self.current_effect_name = s.get("effect", self.current_effect_name)
+        self.mode = s.get("mode", self.mode)
+        log.info("Settings loaded: effect=%s brightness=%.0f%%",
+                 self.current_effect_name, self.brightness * 100)
+
+    def save_settings(self):
+        """Persist current settings to disk."""
+        _save_settings({
+            "brightness": self.brightness,
+            "speed": self.speed,
+            "color1": list(self.color1),
+            "color2": list(self.color2),
+            "effect": self.current_effect_name,
+            "mode": self.mode,
+        })
+
+    def connect_keyboard(self) -> bool:
+        try:
+            self.kb = WootingRGB()
+            if self.kb.is_connected():
+                self.tracked_kb = TrackedKeyboard(self.kb)
+                self.connected = True
+                try:
+                    self._device_info = self.kb.get_device_info()
+                except Exception:
+                    self._device_info = None
+                log.info("Keyboard connected!")
+                return True
+            else:
+                log.warning("Keyboard not found")
+        except Exception as e:
+            log.error("Connection error: %s", e)
+        self.connected = False
+        self._device_info = None
+        return False
+
+    def disconnect_keyboard(self):
+        """Cleanly disconnect the keyboard."""
+        if self.kb:
+            try:
+                self.kb.reset()
+                self.kb.close()
+            except Exception:
+                pass
+        self.kb = None
+        self.tracked_kb = None
+        self.connected = False
+        self._device_info = None
+
+    def set_effect(self, name: str):
+        if name == "screen_ambience":
+            return self._enable_screen_ambience()
+
+        self._disable_screen_ambience()
+
+        if name not in EFFECTS:
+            return False
+        self.current_effect_name = name
+        self.current_effect = EFFECTS[name]()
+        self.current_effect.brightness = self.brightness
+        self.current_effect.speed = self.speed
+        self.current_effect.color1 = self.color1
+        self.current_effect.color2 = self.color2
+        self.mode = "effect"
+        return True
+
+    def _enable_screen_ambience(self) -> bool:
+        """Ativa Screen Ambience como um efeito selecionável na UI."""
+        if not HAS_SCREEN_AMBIENCE:
+            return False
+        try:
+            if self.screen_ambience is None:
+                profile_dir = os.path.join(_base_dir, "profiles")
+                self.screen_ambience = load_ambience_profile(self.tracked_kb, profile_dir=profile_dir)
+            self.screen_ambience.activate()
+            self.current_effect_name = "screen_ambience"
+            self.current_effect = None
+            self.mode = "effect"
+            return True
+        except Exception:
+            log.exception("Failed to enable Screen Ambience")
+            self.screen_ambience = None
+            return False
+
+    def _disable_screen_ambience(self):
+        if self.screen_ambience:
+            try:
+                self.screen_ambience.deactivate()
+            except Exception:
+                pass
+
+    def start_audio(self) -> bool:
+        if self.audio_running:
+            return True
+        if self.audio.start():
+            self.audio_running = True
+            self.mode = "audio"
+            self.eq_effect.brightness = self.brightness
+            return True
+        return False
+
+    def stop_audio(self):
+        self.audio.stop()
+        self.audio_running = False
+
+    def start_keyboard_listener(self):
+        """Inicia o listener de teclado para reactive typing / ripple."""
+        if not HAS_PYNPUT or self._kb_listener is not None:
+            return
+        def on_press(key):
+            vk = _get_vk(key)
+            if vk is None:
+                return
+            pos = VK_TO_SDK.get(vk)
+            if pos is None:
+                return
+            row, col = pos
+            if self.current_effect and hasattr(self.current_effect, "trigger"):
+                self.current_effect.trigger(row, col)
+
+        def on_release(key):
+            return None
+
+        self._kb_listener = pynput_kb.Listener(on_press=on_press, on_release=on_release)
+        self._kb_listener.daemon = True
+        self._kb_listener.start()
+
+    def stop_keyboard_listener(self):
+        if self._kb_listener:
+            self._kb_listener.stop()
+            self._kb_listener = None
+
+    def start_loop(self):
+        if self.running:
+            return
+        self.running = True
+        self.start_keyboard_listener()
+        self._thread = threading.Thread(target=self._main_loop, daemon=True)
+        self._thread.start()
+
+    def stop_loop(self):
+        self.running = False
+        self._disable_screen_ambience()
+        self.stop_keyboard_listener()
+        if self._thread:
+            self._thread.join(timeout=2)
+
+    def _main_loop(self):
+        """Loop principal ~60fps — atualiza efeitos no teclado."""
+        frame_time = 1 / 60
+        while self.running:
+            start = time.perf_counter()
+            now = time.time()
+
+            try:
+                if not self.connected:
+                    self.connect_keyboard()
+                    if not self.connected:
+                        time.sleep(1)
+                        continue
+
+                tkb = self.tracked_kb
+
+                if self.mode == "off":
+                    # Turn off all LEDs
+                    for row in range(WOOTING_RGB_ROWS):
+                        for col in range(WOOTING_RGB_COLS):
+                            tkb.array_set_single(row, col, 0, 0, 0)
+                    tkb.array_update()
+
+                elif self.mode == "audio" and self.audio_running:
+                    bands = self.audio.get_bands()
+                    peaks = self.audio.get_peaks()
+                    self.eq_effect.set_bands(bands, peaks)
+                    self.eq_effect.update(tkb, now)
+
+                elif self.mode == "effect" and self.current_effect:
+                    self.current_effect.update(tkb, now)
+
+                elif self.mode == "effect" and self.current_effect_name == "screen_ambience":
+                    # Screen ambience updates are pushed asynchronously by its own engine.
+                    pass
+
+                elif self.mode == "perkey":
+                    for row in range(WOOTING_RGB_ROWS):
+                        for col in range(WOOTING_RGB_COLS):
+                            r, g, b = self.perkey_colors[row][col]
+                            tkb.array_set_single(row, col, r, g, b)
+                    tkb.array_update()
+
+                # Sample OS CapsLock state each frame so external changes
+                # (other apps toggling Caps) are reflected immediately.
+                if HAS_CTYPES:
+                    try:
+                        new_caps = bool(ctypes.windll.user32.GetKeyState(0x14) & 1)
+                        prev = getattr(self, "_prev_caps_state", None)
+                        if new_caps != prev:
+                            log.info("CapsLock state: %s", "ON" if new_caps else "OFF")
+                            self._prev_caps_state = new_caps
+                        self.input_caps = new_caps
+                    except Exception:
+                        pass
+
+                # If CapsLock is active, force only the Caps key to static white
+                # after the current effect has updated the frame. This overrides
+                # the Caps key color but leaves every other key untouched.
+                try:
+                    if self.input_caps:
+                        tkb.array_set_single(3, 0, 255, 255, 255)
+                        # Commit immediately so the override is visible
+                        # independently of the effect's own update timing.
+                        tkb.array_update()
+                except Exception:
+                    pass
+
+                # Capture frame for UI preview
+                self._capture_frame(tkb)
+            except Exception:
+                log.exception("Main loop error")
+                # If keyboard disconnected mid-frame, mark as disconnected
+                try:
+                    if self.kb and not self.kb.is_connected():
+                        self.connected = False
+                        self._device_info = None
+                        log.warning("Keyboard disconnected")
+                except Exception:
+                    self.connected = False
+
+            elapsed = time.perf_counter() - start
+            sleep_t = frame_time - elapsed
+            if sleep_t > 0:
+                time.sleep(sleep_t)
+
+    def _capture_frame(self, tkb: TrackedKeyboard):
+        """Copy tracked frame into serializable dict."""
+        colors = {}
+        for row in range(1, 6):  # SDK rows 1-5
+            for col in range(14):  # 60HE cols 0-13
+                r, g, b = tkb.frame[row][col]
+                if r or g or b:
+                    colors[f"{row}-{col}"] = [r, g, b]
+        self.frame_colors = colors
+
+    def get_frame_delta(self) -> dict | None:
+        """Return only changed keys since last call, or None if no changes."""
+        cur = self.frame_colors
+        prev = self._prev_frame
+        delta = {}
+        all_keys = set(cur.keys()) | set(prev.keys())
+        for k in all_keys:
+            c = cur.get(k)
+            p = prev.get(k)
+            if c != p:
+                delta[k] = c if c else [0, 0, 0]
+        self._prev_frame = dict(cur)
+        if not delta:
+            return None
+        return {"type": "frame", "colors": delta, "delta": True}
+
+    def get_full_frame(self) -> dict:
+        """Full frame for initial sync."""
+        self._prev_frame = dict(self.frame_colors)
+        return {"type": "frame", "colors": self.frame_colors, "delta": False}
+
+    def get_state_dict(self) -> dict:
+        """Estado completo para enviar aos clientes."""
+        effect_items = list(EFFECT_NAMES.items())
+        if HAS_SCREEN_AMBIENCE:
+            effect_items.append(("screen_ambience", "Screen Ambience"))
+
+        d = {
+            "type": "state",
+            "connected": self.connected,
+            "mode": self.mode,
+            "effect": self.current_effect_name,
+            "effects": effect_items,
+            "brightness": self.brightness,
+            "speed": self.speed,
+            "color1": list(self.color1),
+            "color2": list(self.color2),
+            "audioRunning": self.audio_running,
+            "audioAvailable": AudioReactive.available(),
+            "pynputAvailable": HAS_PYNPUT,
+            "capsLock": bool(self.input_caps),
+        }
+        if self._device_info:
+            d["device"] = {
+                "model": self._device_info.get("model", "Unknown"),
+                "layout": self._device_info.get("layout", "Unknown"),
+            }
+        return d
+
+    def get_audio_dict(self) -> dict | None:
+        """Dados de áudio para streaming."""
+        if not self.audio_running:
+            return None
+        return {
+            "type": "audio",
+            "bands": self.audio.get_bands(),
+            "peaks": self.audio.get_peaks(),
+            "volume": self.audio.get_volume(),
+        }
+
+
+# ============================================================================
+# FastAPI app
+# ============================================================================
+state = AppState()
+_cleanup_done = False
+
+
+def _force_cleanup():
+    """Garantir que o SDK liberta o teclado em qualquer cenário de saída."""
+    global _cleanup_done
+    if _cleanup_done:
+        return
+    _cleanup_done = True
+    log.info("Cleaning up keyboard SDK...")
+    try:
+        state.save_settings()
+    except Exception:
+        pass
+    try:
+        state.stop_loop()
+    except Exception:
+        pass
+    try:
+        state._disable_screen_ambience()
+    except Exception:
+        pass
+    try:
+        state.stop_audio()
+    except Exception:
+        pass
+    try:
+        state.stop_keyboard_listener()
+    except Exception:
+        pass
+    try:
+        pass
+    except Exception:
+        pass
+    if state.kb:
+        try:
+            state.kb.reset()
+        except Exception:
+            pass
+        try:
+            state.kb.close()
+        except Exception:
+            pass
+        state.kb = None
+        state.tracked_kb = None
+        state.connected = False
+    log.info("Keyboard SDK released.")
+
+
+# Registar cleanup para QUALQUER forma de saída do processo
+atexit.register(_force_cleanup)
+
+
+def _signal_shutdown(signum, frame):
+    """Handle SIGINT/SIGTERM — cleanup and exit."""
+    _force_cleanup()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, _signal_shutdown)
+signal.signal(signal.SIGTERM, _signal_shutdown)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    state.connect_keyboard()
+    state.set_effect(state.current_effect_name)
+    state.start_loop()
+    yield
+    # Shutdown (graceful via uvicorn)
+    _force_cleanup()
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:9120", "http://localhost:9120"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ── WebSocket (must be registered BEFORE static files mount) ──
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    state.clients.add(ws)
+
+    # Enviar estado inicial + full frame
+    await ws.send_json(state.get_state_dict())
+    if state.frame_colors:
+        await ws.send_json(state.get_full_frame())
+
+    # Tarefa de push de dados de áudio e frame (~15fps preview)
+    async def data_push():
+        while True:
+            try:
+                # Push frame delta at ~15fps
+                if state.connected:
+                    delta = state.get_frame_delta()
+                    if delta:
+                        await ws.send_json(delta)
+                # Push audio data
+                if state.audio_running:
+                    data = state.get_audio_dict()
+                    if data:
+                        await ws.send_json(data)
+                await asyncio.sleep(1 / 15)  # 15fps for UI preview
+            except Exception:
+                break
+
+    push_task = asyncio.create_task(data_push())
+
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+            await handle_message(ws, msg)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        log.exception("WebSocket error")
+    finally:
+        push_task.cancel()
+        state.clients.discard(ws)
+
+
+async def broadcast(data: dict):
+    """Envia para todos os clientes conectados."""
+    dead = set()
+    for ws in state.clients:
+        try:
+            await ws.send_json(data)
+        except Exception:
+            dead.add(ws)
+    state.clients -= dead
+
+
+async def handle_message(ws: WebSocket, msg: dict):
+    """Processa mensagens recebidas do frontend."""
+    action = msg.get("action")
+    try:
+        log.info("WS message received: %s", json.dumps(msg))
+    except Exception:
+        log.info("WS message received (unserializable)")
+
+    if action == "get_state":
+        await ws.send_json(state.get_state_dict())
+
+    elif action == "set_effect":
+        name = msg.get("name", "")
+        if state.set_effect(name):
+            state.stop_audio()
+            state.save_settings()
+            await broadcast(state.get_state_dict())
+
+    elif action == "start_audio":
+        state.start_audio()
+        await broadcast(state.get_state_dict())
+
+    elif action == "stop_audio":
+        state.stop_audio()
+        state.mode = "effect"
+        state.save_settings()
+        await broadcast(state.get_state_dict())
+
+    elif action == "set_brightness":
+        val = max(0.0, min(1.0, float(msg.get("value", 1.0))))
+        state.brightness = val
+        if state.current_effect:
+            state.current_effect.brightness = val
+        state.eq_effect.brightness = val
+        state.save_settings()
+        await broadcast(state.get_state_dict())
+
+    elif action == "set_speed":
+        val = max(0.1, min(5.0, float(msg.get("value", 1.0))))
+        state.speed = val
+        if state.current_effect:
+            state.current_effect.speed = val
+        state.save_settings()
+        await broadcast(state.get_state_dict())
+
+    elif action == "set_color1":
+        c = msg.get("color", [0, 255, 200])
+        state.color1 = tuple(max(0, min(255, int(v))) for v in c[:3])
+        if state.current_effect:
+            state.current_effect.color1 = state.color1
+        state.save_settings()
+        await broadcast(state.get_state_dict())
+
+    elif action == "set_color2":
+        c = msg.get("color", [255, 0, 100])
+        state.color2 = tuple(max(0, min(255, int(v))) for v in c[:3])
+        if state.current_effect:
+            state.current_effect.color2 = state.color2
+        state.save_settings()
+        await broadcast(state.get_state_dict())
+
+    elif action == "set_perkey":
+        row = int(msg.get("row", 0))
+        col = int(msg.get("col", 0))
+        c = msg.get("color", [255, 255, 255])
+        if 0 <= row < WOOTING_RGB_ROWS and 0 <= col < WOOTING_RGB_COLS:
+            state.perkey_colors[row][col] = tuple(
+                max(0, min(255, int(v))) for v in c[:3]
+            )
+
+    elif action == "set_all_perkey":
+        c = msg.get("color", [255, 255, 255])
+        color = tuple(max(0, min(255, int(v))) for v in c[:3])
+        for row in range(WOOTING_RGB_ROWS):
+            for col in range(WOOTING_RGB_COLS):
+                state.perkey_colors[row][col] = color
+
+    elif action == "set_audio_sensitivity":
+        val = max(0.1, min(5.0, float(msg.get("value", 1.5))))
+        state.audio.sensitivity = val
+
+    elif action == "set_audio_smoothing":
+        val = max(0.0, min(0.95, float(msg.get("value", 0.3))))
+        state.audio.smoothing = val
+
+    elif action == "set_mode":
+        mode = msg.get("mode", "effect")
+        if mode in ("effect", "audio", "perkey", "off"):
+            state.mode = mode
+            if mode == "audio":
+                state._disable_screen_ambience()
+                state.start_audio()
+            elif mode != "audio":
+                state.stop_audio()
+            state.save_settings()
+            await broadcast(state.get_state_dict())
+
+    elif action == "reconnect":
+        state.disconnect_keyboard()
+        state.connect_keyboard()
+        await broadcast(state.get_state_dict())
+
+    elif action == "reset_perkey":
+        state.perkey_colors = [
+            [(0, 0, 0)] * WOOTING_RGB_COLS for _ in range(WOOTING_RGB_ROWS)
+        ]
+        await broadcast(state.get_state_dict())
+
+
+# ── Static files (built React app) — AFTER all routes ──
+_base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+ui_dist = os.path.join(_base_dir, "ui", "dist")
+if os.path.isdir(ui_dist):
+    app.mount("/", StaticFiles(directory=ui_dist, html=True), name="ui")
+
+
+# ============================================================================
+# Entry point
+# ============================================================================
+def main():
+    import uvicorn
+    print("🎹 Wooting RGB Server — http://localhost:9120")
+    print("   WebSocket: ws://localhost:9120/ws")
+    uvicorn.run(app, host="127.0.0.1", port=9120, log_level="warning")
+
+
+if __name__ == "__main__":
+    main()

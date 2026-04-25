@@ -1,3 +1,1 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:86d2f34e1fdc8d2dd728b395a51daa7dccb8493d8b724341b1214a9f78ba624d
-size 375
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/colorpicker.tsx","./src/components/effectspanel.tsx","./src/components/keyboardpreview.tsx","./src/components/perkeypanel.tsx","./src/components/settings.tsx","./src/components/sidebar.tsx","./src/components/soundreactive.tsx","./src/hooks/usewebsocket.ts"],"version":"5.8.3"}

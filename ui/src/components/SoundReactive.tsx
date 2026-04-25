@@ -1,3 +1,166 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f10d856739aa86cbaf98f0df7f2db9de600cc13791166120ecfa04797234f1d8
-size 5431
+import { useRef, useEffect, useCallback } from "react";
+import type { AppState, AudioData } from "../types";
+
+interface Props {
+  state: AppState;
+  audio: AudioData | null;
+  send: (data: Record<string, unknown>) => void;
+}
+
+const BAR_COLORS = [
+  "#00ff55", "#22ff44", "#44ff33", "#66ff22", "#88ff11",
+  "#aaee00", "#cccc00", "#eeaa00", "#ff8800", "#ff6600",
+  "#ff4400", "#ff2200", "#ff0000", "#ff0044",
+];
+
+export function SoundReactive({ state, audio, send }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const drawBars = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.clientWidth;
+    const H = canvas.clientHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, W, H);
+
+    if (!audio) return;
+
+    const numBands = audio.bands.length;
+    const barW = (W - (numBands - 1) * 4) / numBands;
+    const maxH = H - 20;
+
+    for (let i = 0; i < numBands; i++) {
+      const x = i * (barW + 4);
+      const val = Math.min(1, audio.bands[i]);
+      const h = val * maxH;
+      const peak = Math.min(1, audio.peaks[i]) * maxH;
+
+      // Bar gradient (bottom to top)
+      const grad = ctx.createLinearGradient(x, H, x, H - maxH);
+      grad.addColorStop(0, "#00ff55");
+      grad.addColorStop(0.5, "#cccc00");
+      grad.addColorStop(0.8, "#ff6600");
+      grad.addColorStop(1, "#ff0044");
+
+      // Bar
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(x, H - h, barW, h, [3, 3, 0, 0]);
+      ctx.fill();
+
+      // Peak indicator
+      if (peak > 2) {
+        ctx.fillStyle = BAR_COLORS[i] || "#ff0044";
+        ctx.fillRect(x, H - peak - 3, barW, 3);
+      }
+
+      // Frequency label
+      ctx.fillStyle = "#555";
+      ctx.font = "9px system-ui";
+      ctx.textAlign = "center";
+      const freqs = ["30", "60", "120", "250", "500", "1k", "2k", "4k", "6k", "8k", "10k", "12k", "14k", "16k"];
+      ctx.fillText(freqs[i] || "", x + barW / 2, H - 2);
+    }
+
+    // Volume meter
+    const volW = 4;
+    const volH = audio.volume * maxH;
+    ctx.fillStyle = "#00ffc8";
+    ctx.fillRect(W - volW - 2, H - volH - 10, volW, volH);
+  }, [audio]);
+
+  useEffect(() => {
+    drawBars();
+  }, [drawBars]);
+
+  // Redraw at ~30fps when audio is streaming
+  useEffect(() => {
+    if (!state.audioRunning) return;
+    drawBars();
+  }, [audio, state.audioRunning, drawBars]);
+
+  const toggle = () => {
+    if (state.audioRunning) {
+      send({ action: "stop_audio" });
+    } else {
+      send({ action: "start_audio" });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      {/* Header & toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Som Reativo</h2>
+          <p className="text-xs text-gray-500">Equalizer baseado no áudio do sistema (WASAPI Loopback)</p>
+        </div>
+        <button
+          onClick={toggle}
+          className={`px-5 py-2 rounded-lg font-medium text-sm transition-all duration-300
+            ${state.audioRunning
+              ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+              : "bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25"
+            }`}
+        >
+          {state.audioRunning ? "⏹ Parar" : "▶ Iniciar"}
+        </button>
+      </div>
+
+      {!state.audioAvailable && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3 text-sm text-yellow-400">
+          PyAudioWPATCH não disponível. Instala com: pip install pyaudiowpatch
+        </div>
+      )}
+
+      {/* Equalizer visualization */}
+      <div className="flex-1 bg-dark-800 rounded-xl border border-dark-600 p-4 min-h-[200px]">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full"
+          style={{ minHeight: 180 }}
+        />
+      </div>
+
+      {/* Controls */}
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-400 flex justify-between">
+            Sensibilidade
+            <span className="text-accent-cyan">{((state as any)._sensitivity ?? 1.5).toFixed(1)}</span>
+          </span>
+          <input
+            type="range"
+            min={10}
+            max={500}
+            defaultValue={150}
+            onChange={(e) => send({ action: "set_audio_sensitivity", value: +e.target.value / 100 })}
+            className="accent-cyan-400"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-400 flex justify-between">
+            Suavização
+            <span className="text-accent-cyan">{((state as any)._smoothing ?? 0.3).toFixed(2)}</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={95}
+            defaultValue={30}
+            onChange={(e) => send({ action: "set_audio_smoothing", value: +e.target.value / 100 })}
+            className="accent-cyan-400"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
