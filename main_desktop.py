@@ -13,6 +13,16 @@ import traceback
 import logging
 import shutil
 import subprocess
+import json
+import tempfile
+import urllib.request
+import urllib.error
+import webbrowser
+
+try:
+    from app_version import APP_VERSION
+except Exception:
+    APP_VERSION = "0.0.0-dev"
 
 # Garantir que imports relativos funcionam no PyInstaller
 if getattr(sys, "frozen", False):
@@ -33,6 +43,11 @@ _log = logging.getLogger("main_desktop")
 _log.info("=== WootFlow startup ===")
 _log.info("BASE=%s", _BASE)
 _log.info("sys.frozen=%s", getattr(sys, 'frozen', False))
+_log.info("app_version=%s", APP_VERSION)
+
+_UPDATE_REPO = "carloscosta2025086-web/WootFlow"
+_UPDATE_API = f"https://api.github.com/repos/{_UPDATE_REPO}/releases/latest"
+_UPDATE_STATE_FILE = os.path.join(os.environ.get("LOCALAPPDATA", _BASE), "WootFlow", "update_state.json")
 
 # Importar server no thread principal para garantir acesso ao cleanup
 try:
@@ -185,8 +200,215 @@ def _ensure_windows_prerequisites():
         _try_install_with_winget(package_id, package_name)
 
 
+def _parse_version(version_text: str):
+    v = (version_text or "").strip().lower()
+    if v.startswith("v"):
+        v = v[1:]
+    parts = []
+    for item in v.split("."):
+        num = ""
+        for ch in item:
+            if ch.isdigit():
+                num += ch
+            else:
+                break
+        parts.append(int(num) if num else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def _is_newer_version(latest_tag: str, current_version: str) -> bool:
+    return _parse_version(latest_tag) > _parse_version(current_version)
+
+
+def _ensure_update_state_dir():
+    folder = os.path.dirname(_UPDATE_STATE_FILE)
+    if folder and not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+
+
+def _should_check_updates(interval_hours: int = 12) -> bool:
+    try:
+        if not os.path.exists(_UPDATE_STATE_FILE):
+            return True
+        with open(_UPDATE_STATE_FILE, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        last_check = float(state.get("last_check_epoch", 0))
+        return (time.time() - last_check) >= interval_hours * 3600
+    except Exception:
+        return True
+
+
+def _mark_update_checked():
+    try:
+        _ensure_update_state_dir()
+        with open(_UPDATE_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"last_check_epoch": time.time()}, f)
+    except Exception:
+        _log.exception("Falha ao gravar estado de update")
+
+
+def _message_box(title: str, message: str, flags: int) -> int:
+    try:
+        import ctypes
+        return ctypes.windll.user32.MessageBoxW(None, message, title, flags)
+    except Exception:
+        return 0
+
+
+def _fetch_latest_release_info():
+    req = urllib.request.Request(
+        _UPDATE_API,
+        headers={
+            "User-Agent": "WootFlow-Updater",
+            "Accept": "application/vnd.github+json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    return {
+        "tag_name": payload.get("tag_name", ""),
+        "html_url": payload.get("html_url", f"https://github.com/{_UPDATE_REPO}/releases"),
+        "assets": payload.get("assets", []) or [],
+    }
+
+
+def _find_exe_asset(assets):
+    for asset in assets:
+        if (asset.get("name") or "").lower() == "wootingrgb.exe":
+            return asset
+    return None
+
+
+def _download_update_exe(asset) -> str:
+    url = asset.get("browser_download_url")
+    if not url:
+        raise RuntimeError("Asset sem URL de download")
+
+    update_dir = os.path.join(os.environ.get("LOCALAPPDATA", _BASE), "WootFlow", "updates")
+    os.makedirs(update_dir, exist_ok=True)
+    temp_path = os.path.join(update_dir, "WootingRGB_new.exe")
+
+    req = urllib.request.Request(url, headers={"User-Agent": "WootFlow-Updater"})
+    with urllib.request.urlopen(req, timeout=60) as resp, open(temp_path, "wb") as out:
+        shutil.copyfileobj(resp, out)
+
+    return temp_path
+
+
+def _spawn_updater_and_exit(new_exe_path: str) -> bool:
+    if not getattr(sys, "frozen", False):
+        return False
+
+    current_exe = sys.executable
+    temp_dir = tempfile.gettempdir()
+    bat_path = os.path.join(temp_dir, "wootflow_apply_update.bat")
+
+    script = """@echo off
+setlocal
+set TARGET=%~1
+set NEWEXE=%~2
+set RETRIES=0
+
+:waitloop
+timeout /t 1 /nobreak >nul
+move /Y "%NEWEXE%" "%TARGET%" >nul 2>nul
+if errorlevel 1 (
+  set /a RETRIES+=1
+  if %RETRIES% GEQ 30 goto fail
+  goto waitloop
+)
+
+start "" "%TARGET%"
+del "%~f0"
+exit /b 0
+
+:fail
+start "" https://github.com/carloscosta2025086-web/WootFlow/releases
+del "%~f0"
+exit /b 1
+"""
+
+    with open(bat_path, "w", encoding="utf-8") as f:
+        f.write(script)
+
+    creation_flags = 0
+    if sys.platform == "win32":
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+    subprocess.Popen(
+        ["cmd", "/c", bat_path, current_exe, new_exe_path],
+        creationflags=creation_flags,
+        close_fds=True,
+    )
+    return True
+
+
+def _check_for_updates_and_maybe_apply() -> bool:
+    """Retorna True quando o app deve terminar para aplicar atualização."""
+    if sys.platform != "win32":
+        return False
+    if not getattr(sys, "frozen", False):
+        return False
+    if not _should_check_updates():
+        return False
+
+    _mark_update_checked()
+
+    try:
+        release = _fetch_latest_release_info()
+    except Exception:
+        _log.exception("Falha ao verificar updates")
+        return False
+
+    latest_tag = release.get("tag_name", "")
+    if not latest_tag or not _is_newer_version(latest_tag, APP_VERSION):
+        return False
+
+    MB_YESNO = 0x00000004
+    MB_ICONINFORMATION = 0x00000040
+    IDYES = 6
+
+    answer = _message_box(
+        "WootFlow - Atualizacao Disponivel",
+        f"Nova versao disponivel: {latest_tag}\nVersao atual: {APP_VERSION}\n\nDeseja atualizar agora?",
+        MB_YESNO | MB_ICONINFORMATION,
+    )
+    if answer != IDYES:
+        return False
+
+    asset = _find_exe_asset(release.get("assets", []))
+    if not asset:
+        _message_box(
+            "WootFlow - Atualizacao",
+            "Nao foi encontrado o ficheiro WootingRGB.exe na release.\nAbrindo pagina de releases.",
+            MB_ICONINFORMATION,
+        )
+        webbrowser.open(release.get("html_url", f"https://github.com/{_UPDATE_REPO}/releases"))
+        return False
+
+    try:
+        new_exe = _download_update_exe(asset)
+        if _spawn_updater_and_exit(new_exe):
+            return True
+    except Exception:
+        _log.exception("Falha ao aplicar update")
+        _message_box(
+            "WootFlow - Atualizacao",
+            "Falha ao aplicar atualizacao automatica.\nAbrindo pagina de releases.",
+            MB_ICONINFORMATION,
+        )
+        webbrowser.open(release.get("html_url", f"https://github.com/{_UPDATE_REPO}/releases"))
+
+    return False
+
+
 def main():
     _ensure_windows_prerequisites()
+
+    if _check_for_updates_and_maybe_apply():
+        return
 
     import webview
 

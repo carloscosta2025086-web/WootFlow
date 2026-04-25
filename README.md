@@ -49,6 +49,9 @@ pyinstaller WootingRGB.spec --clean -y
 - Se faltar runtime essencial, tenta instalar automaticamente via `winget`:
   - Visual C++ Redistributable x64
   - Microsoft Edge WebView2 Runtime
+- O `WootingRGB.exe` tambem verifica atualizacoes automaticamente (GitHub Releases).
+  - Se houver nova versao, avisa o utilizador.
+  - Se o utilizador aceitar, faz download do novo `WootingRGB.exe` e aplica update automaticamente.
 
 ## Releases
 

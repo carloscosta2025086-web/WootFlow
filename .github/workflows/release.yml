@@ -39,6 +39,13 @@ jobs:
           Set-Location .\ui
           npm run build
 
+      - name: Set app version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          Set-Content -Path .\app_version.py -Value "APP_VERSION = \"$version\""
+          Get-Content .\app_version.py
+
       - name: Build EXE
         shell: pwsh
         run: |
