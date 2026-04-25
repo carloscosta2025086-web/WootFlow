@@ -11,6 +11,8 @@ import threading
 import time
 import traceback
 import logging
+import shutil
+import subprocess
 
 # Garantir que imports relativos funcionam no PyInstaller
 if getattr(sys, "frozen", False):
@@ -82,7 +84,110 @@ def _cleanup_sdk():
         pass
 
 
+def _has_vcredist_x64() -> bool:
+    """Verifica se o Visual C++ Redistributable x64 (14+) está instalado."""
+    if sys.platform != "win32":
+        return True
+    try:
+        import winreg
+        paths = [
+            r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+            r"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        ]
+        for path in paths:
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as key:
+                    installed, _ = winreg.QueryValueEx(key, "Installed")
+                    major, _ = winreg.QueryValueEx(key, "Major")
+                    if int(installed) == 1 and int(major) >= 14:
+                        return True
+            except OSError:
+                continue
+    except Exception:
+        return False
+    return False
+
+
+def _has_webview2_runtime() -> bool:
+    """Verifica se o WebView2 Runtime está instalado."""
+    if sys.platform != "win32":
+        return True
+    try:
+        import winreg
+        keys = [
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+        ]
+        for hive, path in keys:
+            try:
+                with winreg.OpenKey(hive, path) as key:
+                    version, _ = winreg.QueryValueEx(key, "pv")
+                    if version:
+                        return True
+            except OSError:
+                continue
+    except Exception:
+        return False
+    return False
+
+
+def _try_install_with_winget(package_id: str, package_name: str) -> bool:
+    """Tenta instalar um pacote via winget sem interação do utilizador."""
+    winget = shutil.which("winget")
+    if not winget:
+        _log.warning("winget nao encontrado; nao foi possivel instalar %s", package_name)
+        return False
+
+    cmd = [
+        winget,
+        "install",
+        "--id",
+        package_id,
+        "--exact",
+        "--silent",
+        "--accept-source-agreements",
+        "--accept-package-agreements",
+    ]
+    _log.info("Instalando pre-requisito via winget: %s (%s)", package_name, package_id)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        _log.info("winget returncode=%s", result.returncode)
+        if result.stdout:
+            _log.info("winget stdout: %s", result.stdout[-4000:])
+        if result.stderr:
+            _log.warning("winget stderr: %s", result.stderr[-4000:])
+        return result.returncode == 0
+    except Exception as exc:
+        _log.exception("Falha ao instalar %s via winget: %s", package_name, exc)
+        return False
+
+
+def _ensure_windows_prerequisites():
+    """No Windows, verifica e tenta instalar runtimes essenciais em first-run.
+
+    Nota: pode requerer elevacao/UAC dependendo da maquina.
+    """
+    if sys.platform != "win32":
+        return
+
+    missing = []
+    if not _has_vcredist_x64():
+        missing.append(("Microsoft.VCRedist.2015+.x64", "Visual C++ Redistributable x64"))
+    if not _has_webview2_runtime():
+        missing.append(("Microsoft.EdgeWebView2Runtime", "Microsoft Edge WebView2 Runtime"))
+
+    if not missing:
+        _log.info("Pre-requisitos Windows OK")
+        return
+
+    _log.warning("Pre-requisitos em falta: %s", ", ".join([m[1] for m in missing]))
+    for package_id, package_name in missing:
+        _try_install_with_winget(package_id, package_name)
+
+
 def main():
+    _ensure_windows_prerequisites()
+
     import webview
 
     # Tray support (optional)

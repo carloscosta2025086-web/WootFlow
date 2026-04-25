@@ -42,3 +42,24 @@ npm.cmd run build
 cd ..
 pyinstaller WootingRGB.spec --clean -y
 ```
+
+## Binario (EXE)
+
+- O `WootingRGB.exe` faz verificacao de pre-requisitos no arranque no Windows.
+- Se faltar runtime essencial, tenta instalar automaticamente via `winget`:
+  - Visual C++ Redistributable x64
+  - Microsoft Edge WebView2 Runtime
+
+## Releases
+
+- O ficheiro `.github/workflows/release.yml` publica o binario automaticamente em **Releases** quando fizeres push de uma tag `v*`.
+- Exemplo:
+
+```bash
+git tag v3.0.1
+git push origin v3.0.1
+```
+
+- O workflow anexa ao release:
+  - `WootingRGB.exe`
+  - `WootingRGB-<tag>.zip`

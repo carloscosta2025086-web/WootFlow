@@ -1,0 +1,61 @@
+name: Build And Release Windows Binary
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install all dependencies
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\install_all.ps1
+
+      - name: Build UI
+        shell: pwsh
+        run: |
+          Set-Location .\ui
+          npm run build
+
+      - name: Build EXE
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python.exe -m pip install pyinstaller
+          .\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
+
+      - name: Archive release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path .\release -Force | Out-Null
+          Copy-Item .\dist\WootingRGB.exe .\release\WootingRGB.exe -Force
+          Compress-Archive -Path .\release\WootingRGB.exe -DestinationPath .\release\WootingRGB-${{ github.ref_name }}.zip -Force
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/WootingRGB.exe
+            release/WootingRGB-${{ github.ref_name }}.zip
+          generate_release_notes: true
