@@ -31,7 +31,7 @@ jobs:
       - name: Install all dependencies
         shell: pwsh
         run: |
-          powershell -ExecutionPolicy Bypass -File .\install_all.ps1
+          powershell -ExecutionPolicy Bypass -File .\scripts\install_all.ps1
 
       - name: Build UI
         shell: pwsh
@@ -49,13 +49,22 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path .\release -Force | Out-Null
-          Copy-Item .\dist\WootingRGB.exe .\release\WootingRGB.exe -Force
+
+          $exe = Get-ChildItem .\dist -Recurse -Filter WootingRGB.exe | Select-Object -First 1
+          if (-not $exe) {
+            throw "WootingRGB.exe nao encontrado em dist/."
+          }
+
+          Copy-Item $exe.FullName .\release\WootingRGB.exe -Force
           Compress-Archive -Path .\release\WootingRGB.exe -DestinationPath .\release\WootingRGB-${{ github.ref_name }}.zip -Force
+
+          Get-ChildItem .\release | Format-Table -AutoSize
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/WootingRGB.exe
-            release/WootingRGB-${{ github.ref_name }}.zip
+            release/*
+          fail_on_unmatched_files: true
+          overwrite_files: true
           generate_release_notes: true

@@ -53,6 +53,8 @@ pyinstaller WootingRGB.spec --clean -y
 ## Releases
 
 - O ficheiro `.github/workflows/release.yml` publica o binario automaticamente em **Releases** quando fizeres push de uma tag `v*`.
+- O instalador de dependencias principal esta em `scripts/install_all.ps1`.
+- `install_all.ps1` na raiz continua funcional como atalho de compatibilidade.
 - Exemplo:
 
 ```bash
