@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { AppState, AudioData, FrameData } from "../types";
 
+type WsStatus = "idle" | "connecting" | "connected" | "retrying" | "error";
+
+export interface WsDiagnostics {
+  status: WsStatus;
+  attempt: number;
+  endpoint: string;
+  lastError: string;
+  backendReachable: boolean;
+}
+
 function getWsCandidates(): string[] {
   const candidates = new Set<string>();
 
@@ -28,9 +38,36 @@ export function useWebSocket() {
   const [connected, setConnected] = useState(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const connectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const healthTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const endpointIndex = useRef(0);
   const wsCandidates = useRef<string[]>(getWsCandidates());
   const attemptCount = useRef(0);
+  const [diagnostics, setDiagnostics] = useState<WsDiagnostics>({
+    status: "idle",
+    attempt: 0,
+    endpoint: wsCandidates.current[0] ?? "ws://127.0.0.1:9120/ws",
+    lastError: "",
+    backendReachable: false,
+  });
+
+  const setDiag = useCallback((patch: Partial<WsDiagnostics>) => {
+    setDiagnostics((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const checkBackendHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/health", { method: "GET", cache: "no-store" });
+      if (!res.ok) {
+        setDiag({ backendReachable: false });
+        return;
+      }
+      const payload = await res.json();
+      const ok = Boolean(payload?.ok) && payload?.service === "WootFlow";
+      setDiag({ backendReachable: ok });
+    } catch {
+      setDiag({ backendReachable: false });
+    }
+  }, [setDiag]);
 
   const connect = useCallback(() => {
     if (
@@ -43,6 +80,11 @@ export function useWebSocket() {
     const urls = wsCandidates.current;
     const wsUrl = urls[endpointIndex.current % urls.length];
     attemptCount.current += 1;
+    setDiag({
+      status: "connecting",
+      attempt: attemptCount.current,
+      endpoint: wsUrl,
+    });
 
     console.log(`[WS] Attempt #${attemptCount.current}: Connecting to ${wsUrl}...`);
 
@@ -53,6 +95,10 @@ export function useWebSocket() {
     connectTimer.current = setTimeout(() => {
       if (ws.readyState === WebSocket.CONNECTING) {
         console.warn(`[WS] Connection timeout (${CONNECT_TIMEOUT}ms) for ${wsUrl}, trying next endpoint...`);
+        setDiag({
+          status: "retrying",
+          lastError: `Timeout ao conectar (${CONNECT_TIMEOUT}ms)`,
+        });
         ws.close();
       }
     }, CONNECT_TIMEOUT);
@@ -60,6 +106,11 @@ export function useWebSocket() {
     ws.onopen = () => {
       clearTimeout(connectTimer.current);
       console.log(`[WS] ✓ Connected to ${wsUrl}`);
+      setDiag({
+        status: "connected",
+        lastError: "",
+        backendReachable: true,
+      });
       setConnected(true);
       attemptCount.current = 0;  // Reset counter on success
     };
@@ -98,6 +149,7 @@ export function useWebSocket() {
     ws.onclose = () => {
       clearTimeout(connectTimer.current);
       console.log(`[WS] Disconnected from ${wsUrl}, will retry...`);
+      setDiag({ status: "retrying" });
       setConnected(false);
       endpointIndex.current = (endpointIndex.current + 1) % wsCandidates.current.length;
       clearTimeout(reconnectTimer.current);
@@ -106,18 +158,28 @@ export function useWebSocket() {
 
     ws.onerror = (ev) => {
       console.error(`[WS] Error connecting to ${wsUrl}:`, ev);
+      setDiag({
+        status: "error",
+        lastError: "Falha na ligação WebSocket",
+      });
       ws.close();
     };
-  }, []);
+  }, [setDiag]);
 
   useEffect(() => {
+    checkBackendHealth();
+    clearInterval(healthTimer.current);
+    healthTimer.current = setInterval(checkBackendHealth, 2000);
+
     connect();
+
     return () => {
+      clearInterval(healthTimer.current);
       clearTimeout(connectTimer.current);
       clearTimeout(reconnectTimer.current);
       wsRef.current?.close();
     };
-  }, [connect]);
+  }, [checkBackendHealth, connect]);
 
   const send = useCallback((data: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -125,5 +187,5 @@ export function useWebSocket() {
     }
   }, []);
 
-  return { state, audio, frame, connected, send };
+  return { state, audio, frame, connected, diagnostics, send };
 }

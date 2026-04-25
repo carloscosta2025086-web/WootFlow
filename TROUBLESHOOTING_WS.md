@@ -67,22 +67,16 @@ Possíveis causas:
 2. Reinicia o WootFlow
 3. Se persiste, experimenta outro porto USB
 
-### 5. **Verifica o browser console (F12)**
+### 5. **Usa os diagnósticos no ecrã de loading**
 
-Quando o WootFlow abre, prime `F12` para abrir Developer Tools:
+Se a app ficar em loading, o próprio ecrã já mostra:
+- estado da ligação (`connecting`, `retrying`, `error`)
+- tentativa atual
+- endpoint em uso
+- se o backend está alcançável
+- último erro de ligação
 
-**Procura por logs `[WS]`:**
-```
-[WS] Attempt #1: Connecting to ws://127.0.0.1:9120/ws...
-[WS] ✓ Connected to ws://127.0.0.1:9120/ws
-```
-
-**Se houver erros:**
-```
-[WS] Error connecting to ws://127.0.0.1:9120/ws: ...
-```
-
-Anota o erro exato.
+Anota esses campos para facilitar o diagnóstico.
 
 ---
 
@@ -135,7 +129,7 @@ Se 9120 está bloqueada e não consegues libertar:
 Quando reportas um problema, inclui:
 1. **Output do script diagnóstico** (`diagnose_ws_issue.py`)
 2. **Últimas 50 linhas do log** (`wootflow_debug.log`)
-3. **Console do browser (F12)** — copia os logs `[WS]`
+3. **Dados no ecrã de loading** — status, tentativa, endpoint, backend e erro
 4. **Output de `netstat -ano | findstr :9120`**
 
 ---

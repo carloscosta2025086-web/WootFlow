@@ -188,7 +188,7 @@ def main():
     print()
     print("3. Se health responde mas app fica em 'loading':")
     print("   - Problema está no lado do front-end (React)")
-    print("   - Verifica browser console (F12) para erros JS")
+    print("   - Verifica os detalhes de ligação mostrados no ecrã de loading")
     print()
 
 

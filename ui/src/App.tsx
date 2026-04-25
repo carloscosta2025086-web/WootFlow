@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type CSSProperties } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { Sidebar } from "./components/Sidebar";
 import { EffectsPanel } from "./components/EffectsPanel";
@@ -10,7 +10,7 @@ import type { Page } from "./types";
 import type { RGB } from "./types";
 
 export default function App() {
-  const { state, audio, frame, connected, send } = useWebSocket();
+  const { state, audio, frame, connected, diagnostics, send } = useWebSocket();
   const [page, setPage] = useState<Page>("effects");
 
   // Convert frame data to Map<string, RGB> for KeyboardPreview
@@ -24,19 +24,31 @@ export default function App() {
   }, [frame]);
 
   if (!state) {
+    const statusText: Record<string, string> = {
+      idle: "A iniciar...",
+      connecting: "A tentar ligar WebSocket...",
+      connected: "WebSocket ligado, a aguardar estado inicial...",
+      retrying: "Nova tentativa em curso...",
+      error: "Erro de ligação WebSocket",
+    };
+
     return (
       <div className="h-screen bg-dark-900 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-lg px-6">
           <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500 text-sm">A ligar ao servidor...</p>
-          <p className="text-gray-600 text-xs mt-2">
-            {connected ? "✓ WebSocket conectado, à espera de dados..." : "Tentando conectar..."}
+          <p className="text-gray-400 text-xs mt-3">{statusText[diagnostics.status] ?? diagnostics.status}</p>
+          <p className="text-gray-500 text-xs mt-1">Tentativa: {diagnostics.attempt || 1}</p>
+          <p className="text-gray-500 text-xs mt-1 break-all">Endpoint: {diagnostics.endpoint}</p>
+          <p className="text-gray-500 text-xs mt-1">
+            Backend: {diagnostics.backendReachable ? "OK" : "Indisponivel"}
           </p>
-          <p className="text-gray-600 text-xs mt-1">
-            Endpoints: ws://127.0.0.1:9120/ws
-          </p>
-          <p className="text-gray-500 text-xs mt-3 max-w-xs">
-            Se isto demorar muito, abre o browser console (F12) para diagnósticos.
+          {!!diagnostics.lastError && (
+            <p className="text-red-400 text-xs mt-2">Erro: {diagnostics.lastError}</p>
+          )}
+
+          <p className="text-gray-600 text-xs mt-4">
+            Se ficar preso aqui: fecha outras apps que usem porta 9120 e reinicia o WootFlow.
           </p>
         </div>
       </div>
@@ -48,7 +60,7 @@ export default function App() {
       {/* Titlebar drag region */}
       <div
         className="fixed top-0 left-0 right-0 h-9 z-50"
-        style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+        style={{ WebkitAppRegion: "drag" } as CSSProperties}
       />
 
       {/* Sidebar */}

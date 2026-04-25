@@ -17,6 +17,7 @@ import json
 import tempfile
 import urllib.request
 import urllib.error
+import urllib.parse
 import webbrowser
 
 try:
@@ -211,7 +212,9 @@ def _has_webview2_runtime() -> bool:
         import winreg
         keys = [
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
             (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
         ]
         for hive, path in keys:
             try:
@@ -219,6 +222,29 @@ def _has_webview2_runtime() -> bool:
                     version, _ = winreg.QueryValueEx(key, "pv")
                     if version:
                         return True
+            except OSError:
+                continue
+
+        # Fallback: procurar entradas de uninstall (alguns ambientes registam aqui).
+        uninstall_roots = [
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_CURRENT_USER, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        ]
+        for hive, root in uninstall_roots:
+            try:
+                with winreg.OpenKey(hive, root) as key:
+                    count, _, _ = winreg.QueryInfoKey(key)
+                    for i in range(count):
+                        sub_name = winreg.EnumKey(key, i)
+                        try:
+                            with winreg.OpenKey(key, sub_name) as sub:
+                                display_name, _ = winreg.QueryValueEx(sub, "DisplayName")
+                                if "WebView2 Runtime" in str(display_name):
+                                    return True
+                        except OSError:
+                            continue
             except OSError:
                 continue
     except Exception:
@@ -257,6 +283,31 @@ def _try_install_with_winget(package_id: str, package_name: str) -> bool:
         return False
 
 
+def _download_and_run_installer(name: str, url: str, silent_args: list[str]) -> bool:
+    """Fallback: descarrega instalador oficial e executa em modo silencioso."""
+    try:
+        installers_dir = os.path.join(os.environ.get("LOCALAPPDATA", _BASE), "WootFlow", "installers")
+        os.makedirs(installers_dir, exist_ok=True)
+        filename = os.path.basename(urllib.parse.urlparse(url).path) or f"{name}.exe"
+        local_installer = os.path.join(installers_dir, filename)
+
+        _log.info("Downloading installer for %s from %s", name, url)
+        urllib.request.urlretrieve(url, local_installer)
+
+        cmd = [local_installer, *silent_args]
+        _log.info("Running installer for %s: %s", name, cmd)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
+        _log.info("Installer %s exit code=%s", name, result.returncode)
+        if result.stdout:
+            _log.info("%s stdout: %s", name, result.stdout[-3000:])
+        if result.stderr:
+            _log.warning("%s stderr: %s", name, result.stderr[-3000:])
+        return result.returncode == 0
+    except Exception as exc:
+        _log.exception("Fallback installer failed for %s: %s", name, exc)
+        return False
+
+
 def _ensure_windows_prerequisites():
     """No Windows, verifica e tenta instalar runtimes essenciais em first-run.
 
@@ -276,8 +327,37 @@ def _ensure_windows_prerequisites():
         return
 
     _log.warning("Pre-requisitos em falta: %s", ", ".join([m[1] for m in missing]))
+
+    fallback_map = {
+        "Microsoft.VCRedist.2015+.x64": {
+            "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+            "args": ["/install", "/quiet", "/norestart"],
+        },
+        "Microsoft.EdgeWebView2Runtime": {
+            "url": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+            "args": ["/silent", "/install"],
+        },
+    }
+
     for package_id, package_name in missing:
-        _try_install_with_winget(package_id, package_name)
+        installed = _try_install_with_winget(package_id, package_name)
+        if installed:
+            continue
+
+        fb = fallback_map.get(package_id)
+        if not fb:
+            continue
+        _log.warning("Trying fallback installer for %s", package_name)
+        _download_and_run_installer(package_name, fb["url"], fb["args"])
+
+    still_missing = []
+    if not _has_vcredist_x64():
+        still_missing.append("Visual C++ Redistributable x64")
+    if not _has_webview2_runtime():
+        still_missing.append("Microsoft Edge WebView2 Runtime")
+
+    if still_missing:
+        _log.error("Still missing prerequisites after install attempts: %s", ", ".join(still_missing))
 
 
 def _parse_version(version_text: str):
