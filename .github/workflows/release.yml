@@ -55,6 +55,22 @@ jobs:
           .\.venv\Scripts\python.exe -m pip install pyinstaller
           .\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
 
+      - name: Download installer prerequisites
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\download_installer_prereqs.ps1
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          powershell -ExecutionPolicy Bypass -File .\scripts\build_installer.ps1 -Version $version -SkipUiBuild -SkipExeBuild
+
       - name: Archive release assets
         shell: pwsh
         run: |
@@ -67,6 +83,13 @@ jobs:
 
           Copy-Item $exe.FullName .\release\WootingRGB.exe -Force
           Compress-Archive -Path .\release\WootingRGB.exe -DestinationPath .\release\WootingRGB-${{ github.ref_name }}.zip -Force
+
+          $installer = Get-ChildItem .\installer\output -Filter *.exe | Select-Object -First 1
+          if (-not $installer) {
+            throw "Instalador .exe nao encontrado em installer/output/."
+          }
+
+          Copy-Item $installer.FullName .\release\$($installer.Name) -Force
 
           Get-ChildItem .\release | Format-Table -AutoSize
 

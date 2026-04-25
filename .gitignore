@@ -24,6 +24,8 @@ htmlcov/
 # -----------------------------
 build/
 dist/
+installer/output/*
+installer/prereqs/*.exe
 *.egg-info/
 *.spec.bak
 
@@ -58,3 +60,7 @@ ui/.vite/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Keep installer folder structure, ignore generated payloads.
+!installer/output/.gitkeep
+!installer/prereqs/.gitkeep
