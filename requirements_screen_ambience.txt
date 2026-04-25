@@ -1,3 +1,16 @@
 Pillow>=9.0.0
 mss>=1.1.0
 numpy>=1.20.0
+
+# Backend/API
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# Desktop windowing and tray
+pywebview>=5.0
+pystray>=0.19.0
+pynput>=1.7.0
+
+# Project/runtime extras used by current imports
+bottle>=0.12.0
+pythonnet>=3.0.0
