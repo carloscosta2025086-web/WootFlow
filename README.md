@@ -43,6 +43,9 @@ cd ..
 pyinstaller WootingRGB.spec --clean -y
 ```
 
+- O build recomendado e profissional usa **onedir**: a app final fica em `dist/WootingRGB/`.
+- Isto garante que todos os componentes empacotados (assets, SDK, config, UI) ficam presentes e visiveis no payload instalado.
+
 ## Binario (EXE)
 
 - O `WootingRGB.exe` faz verificacao de pre-requisitos no arranque no Windows.
@@ -67,8 +70,7 @@ git push origin v3.0.1
 ```
 
 - O workflow anexa ao release:
-  - `WootingRGB.exe`
-  - `WootingRGB-<tag>.zip`
+  - `WootingRGB-portable-<tag>.zip`
   - `WootFlow-Setup-<versao>.exe`
 
 ## Instalador Windows
@@ -76,6 +78,7 @@ git push origin v3.0.1
 Solucao recomendada:
 
 - `PyInstaller` gera a aplicacao Windows.
+- `PyInstaller` gera uma pasta `dist/WootingRGB/` com a app completa.
 - `Inno Setup` gera um unico `Setup.exe` para o utilizador final.
 - O instalador copia a app para `Program Files\WootFlow`, cria atalhos, instala/desinstala limpo e evita reinstalar pre-requisitos que ja existem.
 
@@ -113,8 +116,8 @@ Notas:
 Boas praticas para GitHub Releases:
 
 - Publicar sempre os 3 artefactos:
-  - binario portatil (`WootingRGB.exe`)
-  - zip (`WootingRGB-<tag>.zip`)
+  - zip portatil (`WootingRGB-portable-<tag>.zip`)
   - instalador (`WootFlow-Setup-<versao>.exe`)
 - Para utilizador final, divulgar o `WootFlow-Setup-<versao>.exe` como download principal.
+- O zip portatil serve para debug, testes ou utilizadores avancados.
 - Manter `installer/prereqs/*.exe` e `installer/output/*` fora do Git; os artefactos finais devem ir apenas para Releases.

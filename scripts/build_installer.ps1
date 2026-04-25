@@ -52,9 +52,9 @@ if (-not $iscc) {
     throw "ISCC.exe nao encontrado. Instala Inno Setup 6 ou adiciona iscc.exe ao PATH."
 }
 
-$distDir = Join-Path $repoRoot "dist"
+$distDir = Join-Path $repoRoot "dist\WootingRGB"
 if (-not (Test-Path (Join-Path $distDir "WootingRGB.exe"))) {
-    throw "dist\WootingRGB.exe nao encontrado."
+    throw "dist\WootingRGB\WootingRGB.exe nao encontrado."
 }
 
 Write-Host "[4/4] Compilar instalador" -ForegroundColor Cyan

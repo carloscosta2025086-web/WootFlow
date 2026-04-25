@@ -76,13 +76,13 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path .\release -Force | Out-Null
 
-          $exe = Get-ChildItem .\dist -Recurse -Filter WootingRGB.exe | Select-Object -First 1
+          $appDir = Join-Path $PWD "dist\WootingRGB"
+          $exe = Get-Item (Join-Path $appDir "WootingRGB.exe") -ErrorAction SilentlyContinue
           if (-not $exe) {
-            throw "WootingRGB.exe nao encontrado em dist/."
+            throw "WootingRGB.exe nao encontrado em dist\\WootingRGB."
           }
 
-          Copy-Item $exe.FullName .\release\WootingRGB.exe -Force
-          Compress-Archive -Path .\release\WootingRGB.exe -DestinationPath .\release\WootingRGB-${{ github.ref_name }}.zip -Force
+          Compress-Archive -Path (Join-Path $appDir '*') -DestinationPath .\release\WootingRGB-portable-${{ github.ref_name }}.zip -Force
 
           $installer = Get-ChildItem .\installer\output -Filter *.exe | Select-Object -First 1
           if (-not $installer) {
