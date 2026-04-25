@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
-          Set-Content -Path .\app_version.py -Value "APP_VERSION = \"$version\""
+          Set-Content -Path .\app_version.py -Value ('APP_VERSION = "{0}"' -f $version)
           Get-Content .\app_version.py
 
       - name: Build EXE
