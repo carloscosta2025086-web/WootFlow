@@ -667,12 +667,34 @@ signal.signal(signal.SIGTERM, _signal_shutdown)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    state.connect_keyboard()
-    state.set_effect(state.current_effect_name)
-    state.start_loop()
+    try:
+        log.info("=== FastAPI lifespan startup ===")
+        log.info("Connecting to keyboard...")
+        state.connect_keyboard()
+        log.info("✓ Keyboard connected")
+        
+        log.info("Setting effect...")
+        state.set_effect(state.current_effect_name)
+        log.info("✓ Effect set")
+        
+        log.info("Starting main loop...")
+        state.start_loop()
+        log.info("✓ Main loop started")
+        log.info("=== App ready for requests ===")
+    except Exception as _exc:
+        log.exception("CRITICAL: Lifespan startup failed: %s", _exc)
+        log.error("Full traceback: %s", traceback.format_exc())
+        raise
+    
     yield
+    
     # Shutdown (graceful via uvicorn)
-    _force_cleanup()
+    try:
+        log.info("=== FastAPI lifespan shutdown ===")
+        _force_cleanup()
+        log.info("✓ Cleanup complete")
+    except Exception as _exc:
+        log.exception("Error during shutdown: %s", _exc)
 
 
 app = FastAPI(lifespan=lifespan)

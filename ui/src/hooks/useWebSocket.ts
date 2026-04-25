@@ -16,8 +16,8 @@ function getWsCandidates(): string[] {
   return Array.from(candidates);
 }
 
-const RECONNECT_DELAY = 2000;
-const CONNECT_TIMEOUT = 5000;
+const RECONNECT_DELAY = 1500;  // Reduced from 2000ms for faster reconnect
+const CONNECT_TIMEOUT = 8000;  // Increased from 5000ms to allow slower connections
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -30,6 +30,7 @@ export function useWebSocket() {
   const connectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const endpointIndex = useRef(0);
   const wsCandidates = useRef<string[]>(getWsCandidates());
+  const attemptCount = useRef(0);
 
   const connect = useCallback(() => {
     if (
@@ -41,6 +42,9 @@ export function useWebSocket() {
 
     const urls = wsCandidates.current;
     const wsUrl = urls[endpointIndex.current % urls.length];
+    attemptCount.current += 1;
+
+    console.log(`[WS] Attempt #${attemptCount.current}: Connecting to ${wsUrl}...`);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -48,13 +52,16 @@ export function useWebSocket() {
     clearTimeout(connectTimer.current);
     connectTimer.current = setTimeout(() => {
       if (ws.readyState === WebSocket.CONNECTING) {
+        console.warn(`[WS] Connection timeout (${CONNECT_TIMEOUT}ms) for ${wsUrl}, trying next endpoint...`);
         ws.close();
       }
     }, CONNECT_TIMEOUT);
 
     ws.onopen = () => {
       clearTimeout(connectTimer.current);
+      console.log(`[WS] ✓ Connected to ${wsUrl}`);
       setConnected(true);
+      attemptCount.current = 0;  // Reset counter on success
     };
 
     ws.onmessage = (ev) => {
@@ -83,20 +90,24 @@ export function useWebSocket() {
           }
           setFrame({ colors: frameRef.current, delta: false });
         }
-      } catch {
-        // ignore parse errors
+      } catch (err) {
+        console.warn(`[WS] Failed to parse message:`, err);
       }
     };
 
     ws.onclose = () => {
       clearTimeout(connectTimer.current);
+      console.log(`[WS] Disconnected from ${wsUrl}, will retry...`);
       setConnected(false);
       endpointIndex.current = (endpointIndex.current + 1) % wsCandidates.current.length;
       clearTimeout(reconnectTimer.current);
       reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
     };
 
-    ws.onerror = () => ws.close();
+    ws.onerror = (ev) => {
+      console.error(`[WS] Error connecting to ${wsUrl}:`, ev);
+      ws.close();
+    };
   }, []);
 
   useEffect(() => {

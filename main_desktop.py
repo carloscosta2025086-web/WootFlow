@@ -94,16 +94,37 @@ def _start_server():
     try:
         import uvicorn
         _log.info("uvicorn imported OK, starting on :9120")
+        
+        # Diagnóstico: verifica se porta já está em uso
+        try:
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex(('127.0.0.1', 9120))
+            sock.close()
+            if result == 0:
+                _log.critical("PORT 9120 ALREADY IN USE by another process!")
+                raise RuntimeError("Port 9120 already in use")
+        except Exception as _e:
+            if "already in use" in str(_e).lower():
+                _log.critical("PORT 9120 ALREADY IN USE: %s", _e)
+                raise
+        
+        # Tenta iniciar uvicorn
+        _log.info("Starting uvicorn on 127.0.0.1:9120 with log_level=warning")
         uvicorn.run(_srv.app, host="127.0.0.1", port=9120, log_level="warning")
         _log.info("uvicorn exited cleanly")
     except Exception as _exc:
-        _log.exception("SERVER CRASHED: %s", _exc)
+        _log.exception("SERVER CRASHED with exception: %s", _exc)
+        _log.error("Full traceback: %s", traceback.format_exc())
 
 
-def _wait_for_server(timeout: float = 10.0):
+def _wait_for_server(timeout: float = 20.0):
     """Espera até o servidor local responder com health válido."""
+    _log.info("Waiting for server health check (timeout=%s seconds)...", timeout)
     t0 = time.time()
+    attempt = 0
     while time.time() - t0 < timeout:
+        attempt += 1
         try:
             req = urllib.request.Request(
                 "http://127.0.0.1:9120/health",
@@ -112,24 +133,42 @@ def _wait_for_server(timeout: float = 10.0):
             with urllib.request.urlopen(req, timeout=1.5) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
             if payload.get("ok") and payload.get("service") == "WootFlow":
+                elapsed = time.time() - t0
+                _log.info("✓ Server health OK (took %.1f seconds)", elapsed)
                 return True
-        except Exception:
-            time.sleep(0.25)
-            continue
+        except urllib.error.URLError as _e:
+            if attempt % 4 == 0:  # Log a cada 1 segundo
+                _log.debug("Health check attempt %d failed: %s", attempt, _e.reason)
+        except Exception as _e:
+            if attempt % 4 == 0:
+                _log.debug("Health check attempt %d error: %s", attempt, type(_e).__name__)
+        
+        time.sleep(0.25)
+    
+    _log.error("✗ Server health check FAILED after %.1f seconds", timeout)
     return False
 
 
 def _show_server_start_error() -> None:
     msg = (
         "O servidor local do WootFlow nao arrancou corretamente.\n\n"
-        "Isto normalmente acontece quando:\n"
-        "- a porta 9120 esta ocupada por outro processo, ou\n"
-        "- faltam dependencias/runtime.\n\n"
-        "Verifica o log em:\n"
-        f"{_LOG_PATH}\n"
+        "=== POSSÍVEIS CAUSAS ===\n"
+        "1. PORTA 9120 JÁ EM USO:\n"
+        "   Outro processo está usando a porta. Verifica com:\n"
+        "   netstat -ano | findstr :9120\n\n"
+        "2. DEPENDÊNCIAS/RUNTIME FALTANDO:\n"
+        "   Executa: install_all.ps1 para reinstalar\n\n"
+        "3. SDK WOOTING/USB NÃO RESPONDENDO:\n"
+        "   Reconecta o keyboard ou tenta em outro USB\n\n"
+        "4. VISUAL C++ REDISTRIBUTABLE:\n"
+        "   Download: https://support.microsoft.com/en-us/help/2977003\n\n"
+        "=== DIAGNÓSTICO ===\n"
+        f"Log: {_LOG_PATH}\n"
+        "Script: scripts\\diagnose_ws_issue.py\n\n"
+        "Por favor, revê o log acima para erros específicos."
     )
     _log.error("Server health check failed after timeout; aborting UI startup")
-    _message_box("WootFlow - Erro de arranque", msg, 0x00000010)
+    _message_box("WootFlow - Erro de arranque do servidor", msg, 0x00000010)
 
 
 def _cleanup_sdk():

@@ -29,7 +29,15 @@ export default function App() {
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500 text-sm">A ligar ao servidor...</p>
-          <p className="text-gray-600 text-xs mt-1">ws://127.0.0.1:9120/ws</p>
+          <p className="text-gray-600 text-xs mt-2">
+            {connected ? "✓ WebSocket conectado, à espera de dados..." : "Tentando conectar..."}
+          </p>
+          <p className="text-gray-600 text-xs mt-1">
+            Endpoints: ws://127.0.0.1:9120/ws
+          </p>
+          <p className="text-gray-500 text-xs mt-3 max-w-xs">
+            Se isto demorar muito, abre o browser console (F12) para diagnósticos.
+          </p>
         </div>
       </div>
     );
