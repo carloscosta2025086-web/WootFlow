@@ -641,14 +641,12 @@ class AppState:
                     except Exception:
                         pass
 
-                # If CapsLock is active, force only the Caps key to static white
-                # after the current effect has updated the frame. This overrides
-                # the Caps key color but leaves every other key untouched.
+                # If CapsLock is active, override only the Caps key to static white
+                # after the effect/frame update, and commit to hardware.
                 try:
                     if self.input_caps:
+                        # Use array_set_single so both tracked frame and SDK buffer are updated.
                         tkb.array_set_single(3, 0, 255, 255, 255)
-                        # Commit immediately so the override is visible
-                        # independently of the effect's own update timing.
                         tkb.array_update()
                 except Exception:
                     pass
