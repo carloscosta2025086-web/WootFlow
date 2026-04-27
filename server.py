@@ -787,6 +787,8 @@ async def handle_message(ws: WebSocket, msg: dict):
 
     elif action == "set_effect":
         name = msg.get("name", "")
+        # Always disable screen ambience when switching effects
+        state._disable_screen_ambience()
         if state.set_effect(name):
             state.stop_audio()
             state.save_settings()
@@ -866,7 +868,8 @@ async def handle_message(ws: WebSocket, msg: dict):
             if mode == "audio":
                 state._disable_screen_ambience()
                 state.start_audio()
-            elif mode != "audio":
+            else:
+                state._disable_screen_ambience()
                 state.stop_audio()
             state.save_settings()
             await broadcast(state.get_state_dict())

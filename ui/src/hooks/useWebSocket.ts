@@ -151,6 +151,9 @@ export function useWebSocket() {
       console.log(`[WS] Disconnected from ${wsUrl}, will retry...`);
       setDiag({ status: "retrying" });
       setConnected(false);
+      // Clear stale frame so the preview doesn't show stale colors after reconnect
+      frameRef.current = {};
+      setFrame(null);
       endpointIndex.current = (endpointIndex.current + 1) % wsCandidates.current.length;
       clearTimeout(reconnectTimer.current);
       reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);

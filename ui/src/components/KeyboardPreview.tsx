@@ -114,11 +114,18 @@ export function KeyboardPreview({
     const dpr = window.devicePixelRatio || 1;
     const totalW = 15 * UNIT + PAD * 2;
     const totalH = 5 * UNIT + PAD * 2;
-    canvas.width = totalW * dpr;
-    canvas.height = totalH * dpr;
-    canvas.style.width = `${totalW}px`;
-    canvas.style.height = `${totalH}px`;
-    ctx.scale(dpr, dpr);
+    const targetW = Math.round(totalW * dpr);
+    const targetH = Math.round(totalH * dpr);
+
+    // Only resize (and reset transform) when dimensions actually change — avoids
+    // clearing the canvas on every 15fps frame update which causes flicker.
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+      canvas.style.width = `${totalW}px`;
+      canvas.style.height = `${totalH}px`;
+      ctx.scale(dpr, dpr);
+    }
 
     // Background
     ctx.clearRect(0, 0, totalW, totalH);

@@ -434,10 +434,20 @@ def _fetch_latest_release_info():
     }
 
 
-def _find_exe_asset(assets):
+def _find_installer_asset(assets):
+    """Find setup installer asset in release artifacts."""
+    preferred = {"wootflow-setup.exe", "wootflowsetup.exe"}
+
     for asset in assets:
-        if (asset.get("name") or "").lower() == "wootingrgb.exe":
+        name = (asset.get("name") or "").strip().lower()
+        if name in preferred:
             return asset
+
+    for asset in assets:
+        name = (asset.get("name") or "").strip().lower()
+        if name.endswith(".exe") and "wootflow" in name and "setup" in name:
+            return asset
+
     return None
 
 
@@ -448,13 +458,31 @@ def _download_update_exe(asset) -> str:
 
     update_dir = os.path.join(os.environ.get("LOCALAPPDATA", _BASE), "WootFlow", "updates")
     os.makedirs(update_dir, exist_ok=True)
-    temp_path = os.path.join(update_dir, "WootingRGB_new.exe")
+    asset_name = (asset.get("name") or "wootflow-setup.exe").strip() or "wootflow-setup.exe"
+    temp_path = os.path.join(update_dir, asset_name)
 
     req = urllib.request.Request(url, headers={"User-Agent": "WootFlow-Updater"})
     with urllib.request.urlopen(req, timeout=60) as resp, open(temp_path, "wb") as out:
         shutil.copyfileobj(resp, out)
 
     return temp_path
+
+
+def _run_installer_and_exit(installer_path: str) -> bool:
+    """Run installer detached and let the current app exit."""
+    if not installer_path or not os.path.exists(installer_path):
+        return False
+
+    creation_flags = 0
+    if sys.platform == "win32":
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+    subprocess.Popen(
+        [installer_path],
+        creationflags=creation_flags,
+        close_fds=True,
+    )
+    return True
 
 
 def _spawn_updater_and_exit(new_exe_path: str) -> bool:
@@ -538,19 +566,19 @@ def _check_for_updates_and_maybe_apply() -> bool:
     if answer != IDYES:
         return False
 
-    asset = _find_exe_asset(release.get("assets", []))
+    asset = _find_installer_asset(release.get("assets", []))
     if not asset:
         _message_box(
             "WootFlow - Atualizacao",
-            "Nao foi encontrado o ficheiro WootingRGB.exe na release.\nAbrindo pagina de releases.",
+            "Nao foi encontrado o ficheiro wootflow-setup.exe na release.\nAbrindo pagina de releases.",
             MB_ICONINFORMATION,
         )
         webbrowser.open(release.get("html_url", f"https://github.com/{_UPDATE_REPO}/releases"))
         return False
 
     try:
-        new_exe = _download_update_exe(asset)
-        if _spawn_updater_and_exit(new_exe):
+        installer_path = _download_update_exe(asset)
+        if _run_installer_and_exit(installer_path):
             return True
     except Exception:
         _log.exception("Falha ao aplicar update")

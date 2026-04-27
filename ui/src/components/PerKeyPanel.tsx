@@ -33,10 +33,14 @@ export function PerKeyPanel({ state, send }: Props) {
 
   const applyAll = () => {
     send({ action: "set_all_perkey", color: [currentColor.r, currentColor.g, currentColor.b] });
-    // Update visual state
+    // Fill all possible key positions visually (SDK rows 1-5, cols 0-13)
     const newColors = new Map<string, RGB>();
-    // Apply to all keys visually
-    setKeyColors(newColors); // Clear individual, rely on uniform color
+    for (let row = 1; row <= 5; row++) {
+      for (let col = 0; col <= 13; col++) {
+        newColors.set(`${row}-${col}`, { ...currentColor });
+      }
+    }
+    setKeyColors(newColors);
   };
 
   return (
