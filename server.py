@@ -277,6 +277,9 @@ class AppState:
         # WebSocket clients
         self.clients: set[WebSocket] = set()
         self._thread = None
+        self._transition_lock = threading.RLock()
+        self._transition_seq = 0
+        self.debug_mode = os.environ.get("WOOTFLOW_DEBUG", "1").lower() not in ("0", "false", "no")
 
         # Screen ambience profile (optional)
         self.screen_ambience = None
@@ -297,6 +300,145 @@ class AppState:
         self.mode = s.get("mode", self.mode)
         log.info("Settings loaded: effect=%s brightness=%.0f%%",
                  self.current_effect_name, self.brightness * 100)
+
+    def _debug_log(self, message: str, **fields):
+        if not self.debug_mode:
+            return
+        if fields:
+            details = " ".join(f"{k}={fields[k]!r}" for k in sorted(fields))
+            log.info("[DEBUG] %s | %s", message, details)
+        else:
+            log.info("[DEBUG] %s", message)
+
+    def _active_threads(self) -> list[str]:
+        return [t.name for t in threading.enumerate() if t.is_alive()]
+
+    def _is_screen_ambience_active(self) -> bool:
+        return bool(self.screen_ambience and getattr(self.screen_ambience, "is_active", False))
+
+    def _clear_preview_cache(self):
+        self.frame_colors = {}
+        self._prev_frame = {}
+
+    def _wait_effects_drained(self, timeout: float = 1.5) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if not self.audio_running and not self._is_screen_ambience_active():
+                return True
+            time.sleep(0.02)
+        return False
+
+    def _stop_active_effects_locked(self, reason: str):
+        self._debug_log(
+            "Stopping active effects",
+            reason=reason,
+            mode=self.mode,
+            effect=self.current_effect_name,
+            audio_running=self.audio_running,
+            screen_ambience=self._is_screen_ambience_active(),
+        )
+
+        if self._is_screen_ambience_active():
+            self._disable_screen_ambience()
+
+        if self.audio_running:
+            self.audio.stop()
+            self.audio_running = False
+
+        self.current_effect = None
+        self._clear_preview_cache()
+
+    def _transition_to_locked(self, target_mode: str, effect_name: str | None = None) -> bool:
+        self._transition_seq += 1
+        transition_id = self._transition_seq
+        self._debug_log(
+            "Transition begin",
+            id=transition_id,
+            target_mode=target_mode,
+            target_effect=effect_name,
+            thread_count=len(self._active_threads()),
+        )
+
+        self._stop_active_effects_locked(reason=f"transition-{transition_id}")
+        if not self._wait_effects_drained(timeout=1.5):
+            log.error(
+                "[ERROR] Effect overlap detected: previous workers still active before transition id=%s",
+                transition_id,
+            )
+
+        ok = True
+        if target_mode == "effect":
+            name = (effect_name or self.current_effect_name or "breathing").strip()
+            if name == "screen_ambience":
+                ok = self._enable_screen_ambience()
+                if ok:
+                    self.mode = "effect"
+                    self.current_effect_name = "screen_ambience"
+                    self.current_effect = None
+            elif name in EFFECTS:
+                self.current_effect_name = name
+                self.current_effect = EFFECTS[name]()
+                self.current_effect.brightness = self.brightness
+                self.current_effect.speed = self.speed
+                self.current_effect.color1 = self.color1
+                self.current_effect.color2 = self.color2
+                self.mode = "effect"
+            else:
+                ok = False
+        elif target_mode == "audio":
+            ok = self.audio.start()
+            self.audio_running = bool(ok)
+            if ok:
+                self.mode = "audio"
+                self.eq_effect.brightness = self.brightness
+            else:
+                self.mode = "effect"
+        elif target_mode == "perkey":
+            self.mode = "perkey"
+            self.current_effect_name = "perkey"
+            self.current_effect = None
+        elif target_mode == "off":
+            self.mode = "off"
+            self.current_effect_name = "off"
+            self.current_effect = None
+        else:
+            ok = False
+
+        self._debug_log(
+            "Transition end",
+            id=transition_id,
+            ok=ok,
+            mode=self.mode,
+            effect=self.current_effect_name,
+            audio_running=self.audio_running,
+            screen_ambience=self._is_screen_ambience_active(),
+            thread_count=len(self._active_threads()),
+        )
+        return ok
+
+    def transition_to(self, target_mode: str, effect_name: str | None = None) -> bool:
+        with self._transition_lock:
+            return self._transition_to_locked(target_mode, effect_name)
+
+    def _enforce_runtime_invariants_locked(self):
+        if self.mode != "audio" and self.audio_running:
+            log.error("[ERROR] Effect overlap detected: audio_running=True while mode=%s", self.mode)
+            self.audio.stop()
+            self.audio_running = False
+
+        if self._is_screen_ambience_active() and not (
+            self.mode == "effect" and self.current_effect_name == "screen_ambience"
+        ):
+            log.error(
+                "[ERROR] Effect overlap detected: screen ambience active while mode=%s effect=%s",
+                self.mode,
+                self.current_effect_name,
+            )
+            self._disable_screen_ambience()
+
+        if self.current_effect_name == "screen_ambience" and self.current_effect is not None:
+            log.error("[ERROR] Invalid state: screen_ambience selected with non-null current_effect")
+            self.current_effect = None
 
     def save_settings(self):
         """Persist current settings to disk."""
@@ -343,21 +485,7 @@ class AppState:
         self._device_info = None
 
     def set_effect(self, name: str):
-        if name == "screen_ambience":
-            return self._enable_screen_ambience()
-
-        self._disable_screen_ambience()
-
-        if name not in EFFECTS:
-            return False
-        self.current_effect_name = name
-        self.current_effect = EFFECTS[name]()
-        self.current_effect.brightness = self.brightness
-        self.current_effect.speed = self.speed
-        self.current_effect.color1 = self.color1
-        self.current_effect.color2 = self.color2
-        self.mode = "effect"
-        return True
+        return self.transition_to("effect", name)
 
     def _enable_screen_ambience(self) -> bool:
         """Ativa Screen Ambience como um efeito selecionável na UI."""
@@ -380,23 +508,20 @@ class AppState:
     def _disable_screen_ambience(self):
         if self.screen_ambience:
             try:
+                self._debug_log("Stopping effect: ScreenAmbience")
                 self.screen_ambience.deactivate()
             except Exception:
                 pass
 
     def start_audio(self) -> bool:
-        if self.audio_running:
-            return True
-        if self.audio.start():
-            self.audio_running = True
-            self.mode = "audio"
-            self.eq_effect.brightness = self.brightness
-            return True
-        return False
+        return self.transition_to("audio")
 
     def stop_audio(self):
-        self.audio.stop()
-        self.audio_running = False
+        with self._transition_lock:
+            if self.audio_running:
+                self._debug_log("Stopping effect: AudioReactive")
+                self.audio.stop()
+            self.audio_running = False
 
     def start_keyboard_listener(self):
         """Inicia o listener de teclado para reactive typing / ripple."""
@@ -435,7 +560,8 @@ class AppState:
 
     def stop_loop(self):
         self.running = False
-        self._disable_screen_ambience()
+        with self._transition_lock:
+            self._stop_active_effects_locked(reason="loop-stop")
         self.stop_keyboard_listener()
         if self._thread:
             self._thread.join(timeout=2)
@@ -456,27 +582,34 @@ class AppState:
 
                 tkb = self.tracked_kb
 
-                if self.mode == "off":
+                with self._transition_lock:
+                    self._enforce_runtime_invariants_locked()
+                    mode = self.mode
+                    current_effect = self.current_effect
+                    current_effect_name = self.current_effect_name
+                    audio_running = self.audio_running
+
+                if mode == "off":
                     # Turn off all LEDs
                     for row in range(WOOTING_RGB_ROWS):
                         for col in range(WOOTING_RGB_COLS):
                             tkb.array_set_single(row, col, 0, 0, 0)
                     tkb.array_update()
 
-                elif self.mode == "audio" and self.audio_running:
+                elif mode == "audio" and audio_running:
                     bands = self.audio.get_bands()
                     peaks = self.audio.get_peaks()
                     self.eq_effect.set_bands(bands, peaks)
                     self.eq_effect.update(tkb, now)
 
-                elif self.mode == "effect" and self.current_effect:
-                    self.current_effect.update(tkb, now)
+                elif mode == "effect" and current_effect:
+                    current_effect.update(tkb, now)
 
-                elif self.mode == "effect" and self.current_effect_name == "screen_ambience":
+                elif mode == "effect" and current_effect_name == "screen_ambience":
                     # Screen ambience updates are pushed asynchronously by its own engine.
                     pass
 
-                elif self.mode == "perkey":
+                elif mode == "perkey":
                     for row in range(WOOTING_RGB_ROWS):
                         for col in range(WOOTING_RGB_COLS):
                             r, g, b = self.perkey_colors[row][col]
@@ -577,6 +710,7 @@ class AppState:
             "audioAvailable": AudioReactive.available(),
             "pynputAvailable": HAS_PYNPUT,
             "capsLock": bool(self.input_caps),
+            "debugMode": self.debug_mode,
         }
         if self._device_info:
             d["device"] = {
@@ -595,6 +729,19 @@ class AppState:
             "peaks": self.audio.get_peaks(),
             "volume": self.audio.get_volume(),
         }
+
+    def get_debug_snapshot(self) -> dict:
+        with self._transition_lock:
+            threads = self._active_threads()
+            return {
+                "type": "debug",
+                "mode": self.mode,
+                "effect": self.current_effect_name,
+                "audioRunning": self.audio_running,
+                "screenAmbienceActive": self._is_screen_ambience_active(),
+                "activeThreads": threads,
+                "threadCount": len(threads),
+            }
 
 
 # ============================================================================
@@ -620,19 +767,7 @@ def _force_cleanup():
     except Exception:
         pass
     try:
-        state._disable_screen_ambience()
-    except Exception:
-        pass
-    try:
-        state.stop_audio()
-    except Exception:
-        pass
-    try:
-        state.stop_keyboard_listener()
-    except Exception:
-        pass
-    try:
-        pass
+        state.transition_to("off")
     except Exception:
         pass
     if state.kb:
@@ -785,22 +920,23 @@ async def handle_message(ws: WebSocket, msg: dict):
     if action == "get_state":
         await ws.send_json(state.get_state_dict())
 
+    elif action == "get_debug_stats":
+        await ws.send_json(state.get_debug_snapshot())
+
     elif action == "set_effect":
         name = msg.get("name", "")
-        # Always disable screen ambience when switching effects
-        state._disable_screen_ambience()
-        if state.set_effect(name):
-            state.stop_audio()
+        if state.transition_to("effect", name):
             state.save_settings()
             await broadcast(state.get_state_dict())
 
     elif action == "start_audio":
-        state.start_audio()
-        await broadcast(state.get_state_dict())
+        if state.transition_to("audio"):
+            state.save_settings()
+            await broadcast(state.get_state_dict())
 
     elif action == "stop_audio":
-        state.stop_audio()
-        state.mode = "effect"
+        fallback_effect = state.current_effect_name if state.current_effect_name in EFFECTS else "breathing"
+        state.transition_to("effect", fallback_effect)
         state.save_settings()
         await broadcast(state.get_state_dict())
 
@@ -864,13 +1000,13 @@ async def handle_message(ws: WebSocket, msg: dict):
     elif action == "set_mode":
         mode = msg.get("mode", "effect")
         if mode in ("effect", "audio", "perkey", "off"):
-            state.mode = mode
             if mode == "audio":
-                state._disable_screen_ambience()
-                state.start_audio()
+                state.transition_to("audio")
+            elif mode == "effect":
+                fallback_effect = state.current_effect_name if state.current_effect_name in EFFECTS else "breathing"
+                state.transition_to("effect", fallback_effect)
             else:
-                state._disable_screen_ambience()
-                state.stop_audio()
+                state.transition_to(mode)
             state.save_settings()
             await broadcast(state.get_state_dict())
 

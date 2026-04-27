@@ -605,7 +605,7 @@ def main():
     # Tray support (optional)
     try:
         import pystray
-        from PIL import Image, ImageDraw
+        from PIL import Image
         HAS_PYSTRAY = True
     except Exception:
         HAS_PYSTRAY = False
@@ -679,11 +679,10 @@ def main():
             if _tray_icon is not None:
                 return
 
-            # Ícone simples (círculo colorido)
+            # Usa o novo ícone PNG
             try:
-                img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(img)
-                draw.ellipse((8, 8, 56, 56), fill=(48, 120, 200))
+                icon_path = os.path.join(_BASE, "assets", "wootflow_icon_256x256.png")
+                img = Image.open(icon_path)
             except Exception:
                 img = None
 

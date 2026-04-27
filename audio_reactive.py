@@ -119,12 +119,30 @@ class AudioReactive:
         if self._thread:
             self._thread.join(timeout=2)
             self._thread = None
+
+        # Force stream close in case capture thread got stuck.
+        if self._stream is not None:
+            try:
+                self._stream.stop_stream()
+            except Exception:
+                pass
+            try:
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
+
         if self._pa:
             try:
                 self._pa.terminate()
             except Exception:
                 pass
             self._pa = None
+
+        with self._lock:
+            self._bands = [0.0] * NUM_BANDS
+            self._peak = [0.0] * NUM_BANDS
+            self._volume = 0.0
 
     @property
     def running(self) -> bool:

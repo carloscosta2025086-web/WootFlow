@@ -31,9 +31,10 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
+
 OutputDir={#RepoDir}\installer\output
 OutputBaseFilename=WootFlow-Setup-{#AppVersion}
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\assets\wootflow_icon.ico
 DisableProgramGroupPage=yes
 ChangesEnvironment=no
 
@@ -50,10 +51,11 @@ Source: "{#RepoDir}\installer\prereqs\vc_redist.x64.exe"; DestDir: "{tmp}"; Flag
 Source: "{#RepoDir}\installer\prereqs\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall skipifsourcedoesntexist
 Source: "{#RepoDir}\installer\prereqs\MicrosoftEdgeWebView2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall skipifsourcedoesntexist
 
+
 [Icons]
-Name: "{group}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
-Name: "{group}\Desinstalar WootFlow"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\assets\wootflow_icon.ico"
+Name: "{group}\Desinstalar WootFlow"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\wootflow_icon.ico"
+Name: "{autodesktop}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\assets\wootflow_icon.ico"
 
 [Run]
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "A instalar Microsoft Visual C++ Redistributable..."; Flags: waituntilterminated; Check: NeedsVCRedist and FileExists(ExpandConstant('{tmp}\vc_redist.x64.exe'))
