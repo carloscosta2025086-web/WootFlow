@@ -160,20 +160,27 @@ class ScreenAmbienceProfile:
         """Ativa o perfil Screen Ambience."""
         if self.is_active:
             return
-        
         print("[Screen Ambience] Ativando perfil...")
-        
         # Criar engine
         self.engine = ScreenAmbienceEngine(self.config)
         self.engine.set_sample_regions(self.led_sample_regions)
-        
         # Definir callback para atualizar LEDs
         self.engine.set_on_colors_updated(self._on_colors_updated)
-        
         # Iniciar engine
         self.engine.start()
         self.is_active = True
-        
+        # Forçar atualização imediata do frame
+        if hasattr(self.engine, 'on_colors_updated') and self.engine.on_colors_updated:
+            # Gera um frame inicial para garantir atualização
+            if self.engine.sample_regions:
+                frame = self.engine.capture.capture_frame()
+                if frame is not None:
+                    raw_colors = self.engine.analyzer.analyze_regions(frame, self.engine.sample_regions)
+                    smoothed_colors = {
+                        sample_id: self.engine.smoother.smooth(sample_id, color)
+                        for sample_id, color in raw_colors.items()
+                    }
+                    self.engine.on_colors_updated(smoothed_colors)
         print(f"[Screen Ambience] Perfil ativo - Modo: {self.config.mode}")
     
     def deactivate(self):

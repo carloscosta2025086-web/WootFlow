@@ -419,6 +419,17 @@ class AppState:
 
     def transition_to(self, target_mode: str, effect_name: str | None = None) -> bool:
         with self._transition_lock:
+            # Sempre desativa o efeito anterior antes de ativar o novo
+            if self.mode == "effect":
+                if self.current_effect_name == "screen_ambience":
+                    self._disable_screen_ambience()
+                elif self.current_effect is not None:
+                    try:
+                        if hasattr(self.current_effect, "deactivate"):
+                            self.current_effect.deactivate()
+                    except Exception:
+                        pass
+                    self.current_effect = None
             return self._transition_to_locked(target_mode, effect_name)
 
     def _enforce_runtime_invariants_locked(self):
@@ -929,6 +940,8 @@ async def handle_message(ws: WebSocket, msg: dict):
         if state.transition_to("effect", name):
             state.save_settings()
             await broadcast(state.get_state_dict())
+            # Forçar envio de full frame para todos os clientes após troca de efeito
+            await broadcast(state.get_full_frame())
 
     elif action == "start_audio":
         if state.transition_to("audio"):
