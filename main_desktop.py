@@ -542,13 +542,15 @@ def _check_for_updates_and_maybe_apply() -> bool:
     if not _should_check_updates():
         return False
 
-    _mark_update_checked()
-
     try:
         release = _fetch_latest_release_info()
     except Exception:
         _log.exception("Falha ao verificar updates")
         return False
+
+    # Only throttle future checks if we could actually reach and parse the
+    # release endpoint successfully.
+    _mark_update_checked()
 
     latest_tag = release.get("tag_name", "")
     if not latest_tag or not _is_newer_version(latest_tag, APP_VERSION):
