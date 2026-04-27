@@ -119,7 +119,10 @@ Se 9120 está bloqueada e não consegues libertar:
 3. Muda `9120` para outra porta (ex: `9121`)
 4. Salva e reconstrói:
 ```powershell
-.\scripts\build.ps1
+cd ui
+npm run build
+cd ..
+.\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
 ```
 
 ---
@@ -146,7 +149,10 @@ Quando reportas um problema, inclui:
 2. **Reinstala tudo:**
    ```powershell
    .\install_all.ps1
-   .\scripts\build.ps1
+   cd ui
+   npm run build
+   cd ..
+   .\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
    ```
 
 3. **Executa novamente e coleta logs:**
@@ -178,7 +184,10 @@ netstat -ano | findstr :9120
 .\install_all.ps1
 
 # Reconstruir aplicação
-.\scripts\build.ps1
+cd ui
+npm run build
+cd ..
+.\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
 
 # Executar direto (útil para debug)
 python main_desktop.py

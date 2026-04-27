@@ -4,8 +4,8 @@ Demonstra os diferentes modos e configurações disponíveis
 """
 
 import time
-from wooting_rgb import WootingRGB
-from screen_ambience_profile import load_ambience_profile
+from utils.wooting_rgb import WootingRGB
+from core.screen_ambience_profile import load_ambience_profile
 
 
 def example_1_basic_usage():
@@ -129,7 +129,7 @@ def example_5_custom_config():
     print("EXEMPLO 5: Configuração Customizada")
     print("=" * 60)
     
-    from screen_ambience import ScreenAmbienceConfig, ScreenAmbienceEngine
+    from core.screen_ambience import ScreenAmbienceConfig, ScreenAmbienceEngine
     
     # Criar config customizada
     config = ScreenAmbienceConfig(

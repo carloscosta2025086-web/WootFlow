@@ -1,123 +1,37 @@
-# Wooting RGB
+# WootFlow
 
-Aplicacao para controlar iluminacao RGB no teclado Wooting.
+Aplicacao desktop para controlar iluminacao RGB do teclado Wooting.
 
-## Requisitos
+## Inicio rapido
 
-- Python 3.10+
-- Wooting conectado via USB
-- Wootility fechada
-
-## Executar
-
-```bash
-python main_desktop.py
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_all.ps1
+.\.venv\Scripts\python.exe main_desktop.py
 ```
 
-## Funcionalidades
+## Fluxo profissional recomendado
 
-- Efeitos RGB
-- Audio reativo
-- Per-key
-- Screen Ambience
+- Desenvolvimento sem rebuild de EXE: ver [docs/dev.md](docs/dev.md)
+- Release e versionamento SemVer: ver [docs/release.md](docs/release.md)
+- Arquitetura e migracao: ver [docs/architecture.md](docs/architecture.md) e [docs/migration_plan.md](docs/migration_plan.md)
 
-## Configuracao
+## Build local (apenas quando necessario)
 
-Arquivo: `config/config.json`
-
-```json
-{
-  "check_interval": 5,
-  "idle_effect": "breathing",
-  "idle_color": [0, 200, 200]
-}
-```
-
-## Build
-
-```bash
+```powershell
 cd ui
-npm.cmd run build
-
+npm run build
 cd ..
-pyinstaller WootingRGB.spec --clean -y
+.\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
 ```
 
-- O build recomendado e profissional usa **onedir**: a app final fica em `dist/WootingRGB/`.
-- Isto garante que todos os componentes empacotados (assets, SDK, config, UI) ficam presentes e visiveis no payload instalado.
-
-## Binario (EXE)
-
-- O `WootingRGB.exe` faz verificacao de pre-requisitos no arranque no Windows.
-- Se faltar runtime essencial, tenta instalar automaticamente via `winget`:
-  - Visual C++ Redistributable x64
-  - Microsoft Edge WebView2 Runtime
-- O `WootingRGB.exe` tambem verifica atualizacoes automaticamente (GitHub Releases).
-  - Se houver nova versao, avisa o utilizador.
-  - Se o utilizador aceitar, faz download do novo `WootingRGB.exe` e aplica update automaticamente.
-
-## Releases
-
-- O ficheiro `.github/workflows/release.yml` publica o binario automaticamente em **Releases** quando fizeres push de uma tag `v*`.
-- O instalador de dependencias principal esta em `scripts/install_all.ps1`.
-- `install_all.ps1` na raiz continua funcional como atalho de compatibilidade.
-- O workflow publica tambem um instalador Windows `WootFlow-Setup-<versao>.exe`.
-- Exemplo:
-
-```bash
-git tag v3.0.1
-git push origin v3.0.1
-```
-
-- O workflow anexa ao release:
-  - `WootingRGB-portable-<tag>.zip`
-  - `WootFlow-Setup-<versao>.exe`
-
-## Instalador Windows
-
-Solucao recomendada:
-
-- `PyInstaller` gera a aplicacao Windows.
-- `PyInstaller` gera uma pasta `dist/WootingRGB/` com a app completa.
-- `Inno Setup` gera um unico `Setup.exe` para o utilizador final.
-- O instalador copia a app para `Program Files\WootFlow`, cria atalhos, instala/desinstala limpo e evita reinstalar pre-requisitos que ja existem.
-
-Estrutura:
-
-- `installer/WootFlowInstaller.iss`: script do Inno Setup.
-- `installer/prereqs/`: prerequisitos Windows incluidos no setup.
-- `installer/output/`: instaladores gerados.
-- `scripts/download_installer_prereqs.ps1`: transfere prerequisitos do instalador.
-- `scripts/build_installer.ps1`: build automatizado do `Setup.exe`.
-
-Comportamento do Setup.exe:
-
-- Instala a app em `Program Files\WootFlow`.
-- Cria atalho no menu iniciar e opcionalmente no desktop.
-- Verifica e instala apenas se necessario:
-  - Visual C++ Redistributable x64
-  - WebView2 Runtime
-- Mostra progresso e logs do proprio instalador (`SetupLogging=yes`).
-- Depois da instalacao, a app funciona sem precisar de Python, Node.js ou npm no PC do utilizador.
-
-Build local do instalador:
+## Instalador
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\download_installer_prereqs.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\build_installer.ps1 -Version 3.0.6
+powershell -ExecutionPolicy Bypass -File .\scripts\build_installer.ps1 -Version X.Y.Z
 ```
 
-Notas:
+## CI/CD
 
-- O script transfere sempre o `vc_redist.x64.exe` oficial.
-- Para WebView2, o script transfere por omissao o bootstrapper pequeno. Isso da instalacao automatica em um clique, mas pode usar internet durante o setup.
-- Se quiseres media 100% offline, coloca manualmente `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` em `installer/prereqs/` antes de correr `build_installer.ps1`.
-
-Boas praticas para GitHub Releases:
-
-- Publicar sempre os 3 artefactos:
-  - zip portatil (`WootingRGB-portable-<tag>.zip`)
-  - instalador (`WootFlow-Setup-<versao>.exe`)
-- Para utilizador final, divulgar o `WootFlow-Setup-<versao>.exe` como download principal.
-- O zip portatil serve para debug, testes ou utilizadores avancados.
-- Manter `installer/prereqs/*.exe` e `installer/output/*` fora do Git; os artefactos finais devem ir apenas para Releases.
+- PR / push main: [ci.yml](.github/workflows/ci.yml) (lint + testes)
+- Tag `v*`: [release.yml](.github/workflows/release.yml) (build + release)

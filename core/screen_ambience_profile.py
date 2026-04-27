@@ -8,9 +8,9 @@ import os
 import time
 from collections import defaultdict
 from typing import Optional, Dict, Any, Iterable, List, Tuple
-from wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
-from effects_engine import ALL_KEYS
-from screen_ambience import (
+from utils.wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from core.effects_engine import ALL_KEYS
+from core.screen_ambience import (
     ScreenAmbienceEngine, 
     ScreenAmbienceConfig, 
     create_ambience_engine

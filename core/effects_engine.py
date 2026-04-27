@@ -8,7 +8,7 @@ import math
 import time
 import random
 import threading
-from wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from utils.wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
 
 
 # ============================================================================

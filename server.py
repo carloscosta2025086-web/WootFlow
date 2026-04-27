@@ -23,15 +23,16 @@ log = logging.getLogger("wooting")
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 # ── Imports do projecto ──
-from wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
-from effects_engine import (
-    EFFECTS, EFFECT_NAMES, EqualizerEffect, ALL_KEYS,
+from utils.wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from core.effects_engine import (
+    EqualizerEffect, ALL_KEYS,
     scale_color, PHYSICAL_KEYS_60HE, EQ_COLUMNS,
 )
+from core.effect_registry import EFFECT_LABELS, EFFECT_REGISTRY
 from audio_reactive import AudioReactive
 
 try:
-    from screen_ambience_profile import load_ambience_profile
+    from core.screen_ambience_profile import load_ambience_profile
     HAS_SCREEN_AMBIENCE = True
 except Exception:
     HAS_SCREEN_AMBIENCE = False
@@ -375,9 +376,9 @@ class AppState:
                     self.mode = "effect"
                     self.current_effect_name = "screen_ambience"
                     self.current_effect = None
-            elif name in EFFECTS:
+            elif name in EFFECT_REGISTRY:
                 self.current_effect_name = name
-                self.current_effect = EFFECTS[name]()
+                self.current_effect = EFFECT_REGISTRY[name]()
                 self.current_effect.brightness = self.brightness
                 self.current_effect.speed = self.speed
                 self.current_effect.color1 = self.color1
@@ -692,7 +693,7 @@ class AppState:
 
     def get_state_dict(self) -> dict:
         """Estado completo para enviar aos clientes."""
-        effect_items = list(EFFECT_NAMES.items())
+        effect_items = list(EFFECT_LABELS.items())
         if HAS_SCREEN_AMBIENCE:
             effect_items.append(("screen_ambience", "Screen Ambience"))
 
@@ -935,7 +936,7 @@ async def handle_message(ws: WebSocket, msg: dict):
             await broadcast(state.get_state_dict())
 
     elif action == "stop_audio":
-        fallback_effect = state.current_effect_name if state.current_effect_name in EFFECTS else "breathing"
+        fallback_effect = state.current_effect_name if state.current_effect_name in EFFECT_REGISTRY else "breathing"
         state.transition_to("effect", fallback_effect)
         state.save_settings()
         await broadcast(state.get_state_dict())
@@ -1003,7 +1004,7 @@ async def handle_message(ws: WebSocket, msg: dict):
             if mode == "audio":
                 state.transition_to("audio")
             elif mode == "effect":
-                fallback_effect = state.current_effect_name if state.current_effect_name in EFFECTS else "breathing"
+                fallback_effect = state.current_effect_name if state.current_effect_name in EFFECT_REGISTRY else "breathing"
                 state.transition_to("effect", fallback_effect)
             else:
                 state.transition_to(mode)

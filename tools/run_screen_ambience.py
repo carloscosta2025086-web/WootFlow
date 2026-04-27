@@ -8,8 +8,8 @@ import time
 import os
 
 try:
-    from wooting_rgb import WootingRGB
-    from screen_ambience_profile import load_ambience_profile
+    from utils.wooting_rgb import WootingRGB
+    from core.screen_ambience_profile import load_ambience_profile
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     print("Certifique-se de que wooting_rgb está instalado e configurado.")
