@@ -5,7 +5,7 @@ a = Analysis(
     ['main_desktop.py'],
     pathex=[],
     binaries=[],
-    datas=[('sdk', 'sdk'), ('config/config.json', '.'), ('config/rgb_settings.json', 'config'), ('ui/dist', 'ui/dist'), ('profiles', 'profiles')],
+    datas=[('sdk/wooting-rgb-sdk64.dll', 'sdk'), ('config/config.json', '.'), ('config/rgb_settings.json', 'config'), ('ui/dist', 'ui/dist'), ('profiles', 'profiles')],
     hiddenimports=['uvicorn.logging', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'uvicorn.lifespan.off', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.http.h11_impl', 'uvicorn.protocols.http.httptools_impl', 'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto', 'uvicorn.protocols.websockets.websockets_impl', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.loops.asyncio', 'websockets', 'websockets.client', 'websockets.server', 'websockets.legacy', 'wsproto', 'webview', 'clr_loader', 'pythonnet', 'bottle', 'pyaudiowpatch', 'pystray', 'PIL', 'PIL.Image', 'PIL.ImageDraw', 'core.screen_ambience', 'core.screen_ambience_profile', 'mss', 'numpy'],
     hookspath=[],
     hooksconfig={},

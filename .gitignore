@@ -24,6 +24,7 @@ htmlcov/
 # -----------------------------
 build/
 dist/
+.artifacts/
 installer/output/*
 installer/prereqs/*.exe
 *.egg-info/

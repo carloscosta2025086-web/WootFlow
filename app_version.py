@@ -1,1 +1,1 @@
-APP_VERSION = "3.1.2"
+APP_VERSION = "0.0.0-local"
