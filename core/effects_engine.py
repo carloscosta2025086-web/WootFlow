@@ -8,7 +8,7 @@ import math
 import time
 import random
 import threading
-from utils.wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from utils.wooting_rgb import WootFlowRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
 
 
 # ============================================================================
@@ -96,7 +96,7 @@ class Effect:
         self.color1 = (0, 200, 200)
         self.color2 = (128, 0, 255)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         """Atualiza o efeito num frame. t = time.time()."""
         pass
 
@@ -114,7 +114,7 @@ class RainbowWaveEffect(Effect):
         self.speed = 60.0   # graus por segundo
         self.spread = 20.0  # graus entre colunas
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         offset = t * self.speed
         for row in range(WOOTING_RGB_ROWS):
             for col in range(14):
@@ -134,7 +134,7 @@ class ColorWaveEffect(Effect):
         self.color1 = (0, 200, 200)
         self.color2 = (128, 0, 255)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         for row in range(WOOTING_RGB_ROWS):
             for col in range(14):
                 wave = (math.sin(t * self.speed + col * 0.5 + row * 0.3) + 1) / 2
@@ -156,7 +156,7 @@ class BreathingEffect(Effect):
         self.color1 = (0, 200, 200)
         self.min_brightness = 0.1
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         pulse = (math.sin(t * self.speed * math.pi) + 1) / 2
         intensity = self.min_brightness + pulse * (self.brightness - self.min_brightness)
         r = min(255, int(self.color1[0] * intensity))
@@ -176,7 +176,7 @@ class SpectrumCycleEffect(Effect):
         super().__init__()
         self.speed = 30.0  # graus por segundo
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         hue = (t * self.speed) % 360
         r, g, b = hsv_to_rgb(hue, 1.0, self.brightness)
         for row in range(WOOTING_RGB_ROWS):
@@ -207,7 +207,7 @@ class RippleEffect(Effect):
             if len(self._ripples) > 20:
                 self._ripples = self._ripples[-20:]
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         # Base escura
         for row in range(WOOTING_RGB_ROWS):
             for col in range(14):
@@ -259,7 +259,7 @@ class ReactiveTypingEffect(Effect):
         with self._lock:
             self._key_times[(row, col)] = time.time()
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         with self._lock:
             keys = dict(self._key_times)
 
@@ -284,7 +284,7 @@ class FireEffect(Effect):
         super().__init__()
         self._heat = [[0.0] * 14 for _ in range(WOOTING_RGB_ROWS)]
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         import random
         # Gerar calor na linha de baixo
         for col in range(14):
@@ -337,7 +337,7 @@ class MatrixRainEffect(Effect):
             self._drops[col] = random.uniform(-3, WOOTING_RGB_ROWS)
             self._speeds[col] = random.uniform(1.5, 4.0)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         import random
         dt = 1 / 60  # assume 60fps
 
@@ -381,7 +381,7 @@ class StarfieldEffect(Effect):
         self.color1 = (180, 200, 255)
         self._bg = (2, 2, 8)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         for row in range(WOOTING_RGB_ROWS):
             for col in range(14):
                 star = self._stars.get((row, col))
@@ -402,7 +402,7 @@ class SolidColorEffect(Effect):
     """Cor sólida em todas as teclas."""
     name = "Solid Color"
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         r, g, b = scale_color(self.color1, self.brightness)
         for row, col in ALL_KEYS:
             kb.array_set_single(row, col, r, g, b)
@@ -413,7 +413,7 @@ class GradientEffect(Effect):
     """Gradiente estático horizontal entre duas cores."""
     name = "Gradient"
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         for row, col in ALL_KEYS:
             pos = col / 13.0
             r, g, b = lerp_color(self.color1, self.color2, pos)
@@ -434,7 +434,7 @@ class AuroraEffect(Effect):
             (80, 80, 255), (150, 50, 200), (0, 220, 180),
         ]
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         n = len(self._palette)
         for row, col in ALL_KEYS:
             phase = t * self.speed + col * 0.25 + row * 0.15
@@ -462,7 +462,7 @@ class RaindropEffect(Effect):
         self._fade_time = 0.6
         self._bg = (2, 2, 6)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         if t - self._last_drop > self._drop_interval / self.speed:
             self._last_drop = t
             key = random.choice(ALL_KEYS)
@@ -502,7 +502,7 @@ class SparkleEffect(Effect):
         self._fade = 0.3
         self._bg = (3, 3, 8)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         if t - self._last_spark > self._spark_rate / self.speed:
             self._last_spark = t
             for _ in range(random.randint(1, 3)):
@@ -538,7 +538,7 @@ class HeartbeatEffect(Effect):
         self.speed = 1.0
         self.color1 = (255, 0, 60)
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         cycle = (t * self.speed) % 1.5
         if cycle < 0.1:
             intensity = cycle / 0.1
@@ -574,7 +574,7 @@ class LavaEffect(Effect):
                 random.uniform(0, 100),
             )
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         ts = t * self.speed
         for row, col in ALL_KEYS:
             ox, oy, oz = self._offsets[(row, col)]
@@ -605,7 +605,7 @@ class OceanEffect(Effect):
         super().__init__()
         self.speed = 1.0
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         ts = t * self.speed
         for row, col in ALL_KEYS:
             wave1 = math.sin(ts * 0.8 + col * 0.4 + row * 0.2) * 0.5 + 0.5
@@ -670,7 +670,7 @@ class EqualizerEffect(Effect):
             if peaks:
                 self._peaks = peaks[:14] + [0.0] * max(0, 14 - len(peaks))
 
-    def update(self, kb: WootingRGB, t: float):
+    def update(self, kb: WootFlowRGB, t: float):
         with self._lock:
             bands = self._bands.copy()
             peaks = self._peaks.copy()

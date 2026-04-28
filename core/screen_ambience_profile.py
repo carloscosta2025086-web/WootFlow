@@ -8,7 +8,7 @@ import os
 import time
 from collections import defaultdict
 from typing import Optional, Dict, Any, Iterable, List, Tuple
-from utils.wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from utils.wooting_rgb import WootFlowRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
 from core.effects_engine import ALL_KEYS
 from core.screen_ambience import (
     ScreenAmbienceEngine, 
@@ -72,14 +72,14 @@ ROW_SAMPLE_HEIGHT_UNITS = 0.72
 
 
 class ScreenAmbienceProfile:
-    """Gerenciador do perfil Screen Ambience para Wooting RGB."""
+    """Gerenciador do perfil Screen Ambience para WootFlow."""
     
-    def __init__(self, kb: WootingRGB, profile_data: Dict[str, Any]):
+    def __init__(self, kb: WootFlowRGB, profile_data: Dict[str, Any]):
         """
         Inicializa o perfil Screen Ambience.
         
         Args:
-            kb: Instância WootingRGB conectada
+            kb: Instância WootFlowRGB conectada
             profile_data: Dados do perfil (JSON)
         """
         self.kb = kb
@@ -342,12 +342,12 @@ class ScreenAmbienceProfile:
         print("=" * 50 + "\n")
 
 
-def load_ambience_profile(kb: WootingRGB, profile_dir: str = "profiles") -> ScreenAmbienceProfile:
+def load_ambience_profile(kb: WootFlowRGB, profile_dir: str = "profiles") -> ScreenAmbienceProfile:
     """
     Carrega e inicializa o perfil Screen Ambience.
     
     Args:
-        kb: Instância WootingRGB
+        kb: Instância WootFlowRGB
         profile_dir: Diretório de perfis
     
     Returns:

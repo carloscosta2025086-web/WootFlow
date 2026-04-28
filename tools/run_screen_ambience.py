@@ -1,6 +1,6 @@
 """
 Exemplo de uso do Screen Ambience
-Executa o perfil Screen Ambience com o teclado Wooting RGB
+Executa o perfil Screen Ambience com o teclado WootFlow
 """
 
 import sys
@@ -8,7 +8,7 @@ import time
 import os
 
 try:
-    from utils.wooting_rgb import WootingRGB
+    from utils.wooting_rgb import WootFlowRGB
     from core.screen_ambience_profile import load_ambience_profile
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -39,9 +39,9 @@ def main():
     print_banner()
     
     # Conectar ao teclado
-    print("Inicializando teclado Wooting RGB...")
+    print("Inicializando teclado WootFlow...")
     try:
-        kb = WootingRGB()
+        kb = WootFlowRGB()
     except FileNotFoundError as e:
         print(f"ERRO: {e}")
         print("Veja o README.md para instruções de instalação.")

@@ -6,11 +6,11 @@
   #define RepoDir "."
 #endif
 #ifndef SourceDir
-  #define SourceDir "dist\WootingRGB"
+  #define SourceDir "dist\WootFlow"
 #endif
 #define MyAppPublisher "Carlos Costa"
 #define MyAppURL "https://github.com/carloscosta2025086-web/WootFlow"
-#define MyAppExeName "WootingRGB.exe"
+#define MyAppExeName "WootFlow.exe"
 #define MyAppId "{{B7A6E3A8-4A98-49E2-BAF0-5B4EA52F7D91}"
 
 [Setup]

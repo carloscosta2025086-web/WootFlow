@@ -122,7 +122,7 @@ Se 9120 está bloqueada e não consegues libertar:
 cd ui
 npm run build
 cd ..
-.\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
+.\.venv\Scripts\python.exe -m PyInstaller WootFlow.spec --clean -y
 ```
 
 ---
@@ -152,12 +152,12 @@ Quando reportas um problema, inclui:
    cd ui
    npm run build
    cd ..
-   .\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
+   .\.venv\Scripts\python.exe -m PyInstaller WootFlow.spec --clean -y
    ```
 
 3. **Executa novamente e coleta logs:**
    - Abre PowerShell
-   - Corre `python -m pdb WootingRGB.exe` (debugger)
+   - Corre `python -m pdb WootFlow.exe` (debugger)
    - Ou corre `python main_desktop.py` (direto)
 
 4. **Contacta com:**
@@ -187,7 +187,7 @@ netstat -ano | findstr :9120
 cd ui
 npm run build
 cd ..
-.\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
+.\.venv\Scripts\python.exe -m PyInstaller WootFlow.spec --clean -y
 
 # Executar direto (útil para debug)
 python main_desktop.py

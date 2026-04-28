@@ -53,7 +53,7 @@ jobs:
         shell: pwsh
         run: |
           .\.venv\Scripts\python.exe -m pip install pyinstaller
-          .\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y
+          .\.venv\Scripts\python.exe -m PyInstaller WootFlow.spec --clean -y
 
       - name: Download installer prerequisites
         shell: pwsh
@@ -76,13 +76,13 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path .\release -Force | Out-Null
 
-          $appDir = Join-Path $PWD "dist\WootingRGB"
-          $exe = Get-Item (Join-Path $appDir "WootingRGB.exe") -ErrorAction SilentlyContinue
+          $appDir = Join-Path $PWD "dist\WootFlow"
+          $exe = Get-Item (Join-Path $appDir "WootFlow.exe") -ErrorAction SilentlyContinue
           if (-not $exe) {
-            throw "WootingRGB.exe nao encontrado em dist\\WootingRGB."
+            throw "WootFlow.exe nao encontrado em dist\\WootFlow."
           }
 
-          Compress-Archive -Path (Join-Path $appDir '*') -DestinationPath .\release\WootingRGB-portable-${{ github.ref_name }}.zip -Force
+          Compress-Archive -Path (Join-Path $appDir '*') -DestinationPath .\release\WootFlow-portable-${{ github.ref_name }}.zip -Force
 
           $installer = Get-ChildItem .\installer\output -Filter *.exe | Select-Object -First 1
           if (-not $installer) {

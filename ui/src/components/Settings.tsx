@@ -63,7 +63,7 @@ export function Settings({ connected, device, mode, send }: Props) {
       <div className="bg-dark-800 rounded-xl border border-dark-600 p-5">
         <h3 className="text-sm font-medium text-gray-300 mb-3">Sobre</h3>
         <div className="space-y-1 text-sm text-gray-500">
-          <p>Wooting RGB Control v3.1</p>
+          <p>WootFlow Control v3.1</p>
           <p>Layout: ISO PT 60HE</p>
           <p>Backend: Python + FastAPI + WebSocket</p>
           <p>Frontend: React + Tailwind + pywebview</p>
@@ -74,7 +74,7 @@ export function Settings({ connected, device, mode, send }: Props) {
       <div className="bg-dark-800 rounded-xl border border-dark-600 p-5">
         <h3 className="text-sm font-medium text-gray-300 mb-3">Stack</h3>
         <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
-          <span>● Wooting RGB SDK</span>
+          <span>● WootFlow SDK Bridge</span>
           <span>● PyAudioWPATCH (WASAPI)</span>
           <span>● pynput (input hooks)</span>
           <span>● FastAPI + uvicorn</span>

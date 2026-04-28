@@ -1,5 +1,5 @@
 """
-Backend WebSocket server para a UI React do Wooting RGB.
+Backend WebSocket server para a UI React do WootFlow.
 FastAPI + WebSocket — controla efeitos, áudio reativo, cores per-key.
 """
 
@@ -23,7 +23,7 @@ log = logging.getLogger("wooting")
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 # ── Imports do projecto ──
-from utils.wooting_rgb import WootingRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
+from utils.wooting_rgb import WootFlowRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
 from core.effects_engine import (
     EqualizerEffect, ALL_KEYS,
     scale_color, PHYSICAL_KEYS_60HE, EQ_COLUMNS,
@@ -42,9 +42,9 @@ except Exception:
 # Tracked keyboard — intercepts colors for UI preview
 # ============================================================================
 class TrackedKeyboard:
-    """Wrapper around WootingRGB that captures the color buffer for UI."""
+    """Wrapper around WootFlowRGB that captures the color buffer for UI."""
 
-    def __init__(self, kb: WootingRGB):
+    def __init__(self, kb: WootFlowRGB):
         self._kb = kb
         # Frame buffer: row → col → (r, g, b)
         self.frame: list[list[tuple[int, int, int]]] = [
@@ -241,7 +241,7 @@ class AppState:
     """Mantém o estado global da aplicação."""
 
     def __init__(self):
-        self.kb = None          # WootingRGB (raw)
+        self.kb = None          # WootFlowRGB (raw)
         self.tracked_kb = None  # TrackedKeyboard wrapper
         self.connected = False
         self.running = False
@@ -465,7 +465,7 @@ class AppState:
 
     def connect_keyboard(self) -> bool:
         try:
-            self.kb = WootingRGB()
+            self.kb = WootFlowRGB()
             if self.kb.is_connected():
                 self.tracked_kb = TrackedKeyboard(self.kb)
                 self.connected = True
@@ -1046,7 +1046,7 @@ if os.path.isdir(ui_dist):
 # ============================================================================
 def main():
     import uvicorn
-    print("🎹 Wooting RGB Server — http://localhost:9120")
+    print("🎹 WootFlow Server — http://localhost:9120")
     print("   WebSocket: ws://localhost:9120/ws")
     uvicorn.run(app, host="127.0.0.1", port=9120, log_level="warning")
 

@@ -30,7 +30,7 @@ class WootingUSBMeta(Structure):
     ]
 
 
-class WootingRGB:
+class WootFlowRGB:
     """Interface Python para o Wooting RGB SDK."""
 
     def __init__(self, dll_path=None):

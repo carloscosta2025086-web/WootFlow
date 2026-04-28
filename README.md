@@ -37,12 +37,12 @@ powershell -ExecutionPolicy Bypass -File .\run_app.ps1 -SkipUiBuild
 cd ui
 npm run build
 cd ..
-.\.venv\Scripts\python.exe -m PyInstaller WootingRGB.spec --clean -y --workpath .\.artifacts\pyinstaller\work --distpath .\dist
+.\.venv\Scripts\python.exe -m PyInstaller WootFlow.spec --clean -y --workpath .\.artifacts\pyinstaller\work --distpath .\dist
 ```
 
 Notas sobre artefactos:
 
-- `dist/WootingRGB/` = output final portable (usar para testes e installer).
+- `dist/WootFlow/` = output final portable (usar para testes e installer).
 - `.artifacts/pyinstaller/work/` = temporario do PyInstaller (intermedio, pode apagar).
 - `build/` antigo ja nao e usado pelo script `scripts/build_installer.ps1`.
 
@@ -56,7 +56,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_installer.ps1 -Version 
 Se quiseres limpar tudo antes de recomecar um build:
 
 ```powershell
-Remove-Item -Recurse -Force .\dist\WootingRGB, .\.artifacts\pyinstaller\work, .\build -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force .\dist\WootFlow, .\.artifacts\pyinstaller\work, .\build -ErrorAction SilentlyContinue
 ```
 
 ## CI/CD

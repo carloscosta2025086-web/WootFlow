@@ -1,5 +1,5 @@
 """
-Wooting RGB Desktop — abre a UI numa janela nativa via pywebview.
+WootFlow Desktop — abre a UI numa janela nativa via pywebview.
 Inicia o FastAPI server em background e abre a janela apontando para ele.
 Este é o entry point para o .exe (PyInstaller).
 """
@@ -646,7 +646,7 @@ def main():
 
     # Open native window
     window = webview.create_window(
-        title="Wooting RGB",
+        title="WootFlow",
         url="http://127.0.0.1:9120",
         width=1280,
         height=820,
@@ -668,25 +668,30 @@ def main():
             _cleanup_sdk()
             return True
 
-        # Mostrar só a tray e esconder a janela
-        try:
-            window.hide()
-        except Exception:
-            pass
+        # Janela de tempo para considerar duplo clique no ícone da tray.
+        _tray_double_click_window = 0.45
+        _tray_last_open_click = 0.0
 
         def _create_tray():
             nonlocal _tray_icon, _tray_thread
             if _tray_icon is not None:
-                return
+                return True
 
-            # Usa o novo ícone PNG
+            # Usa o ícone empacotado no projeto.
             try:
-                icon_path = os.path.join(_BASE, "assets", "wootflow_icon_256x256.png")
+                icon_path = os.path.join(_BASE, "assets", "Wootflow_icon 256x256.ico")
                 img = Image.open(icon_path)
             except Exception:
                 img = None
 
             def _on_open(icon_obj, item):
+                nonlocal _tray_icon, _tray_thread, _tray_last_open_click
+                now = time.monotonic()
+                # Força comportamento de duplo clique: ignora o primeiro clique.
+                if (now - _tray_last_open_click) > _tray_double_click_window:
+                    _tray_last_open_click = now
+                    return
+                _tray_last_open_click = 0.0
                 try:
                     # Stop tray and restore window
                     try:
@@ -701,10 +706,13 @@ def main():
                     pass
 
             def _on_quit(icon_obj, item):
+                nonlocal _tray_icon, _tray_thread
                 try:
                     icon_obj.stop()
                 except Exception:
                     pass
+                _tray_icon = None
+                _tray_thread = None
                 # Cleanup and exit process
                 _cleanup_sdk()
                 import os, sys
@@ -717,24 +725,38 @@ def main():
                         pass
 
             try:
-                menu = pystray.Menu(pystray.MenuItem("Abrir", _on_open), pystray.MenuItem("Sair", _on_quit))
-                _tray_icon = pystray.Icon("wooting_rgb", img, "Wooting RGB", menu)
+                # No Windows, o item default é acionado com duplo clique no ícone da tray.
+                menu = pystray.Menu(
+                    pystray.MenuItem("Abrir", _on_open, default=True),
+                    pystray.MenuItem("Sair", _on_quit),
+                )
+                _tray_icon = pystray.Icon("wootflow", img, "WootFlow", menu)
 
                 def _run_icon():
                     try:
                         _tray_icon.run()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        print(f"[WootFlow] Tray runtime error: {exc}")
 
                 _tray_thread = threading.Thread(target=_run_icon, daemon=True)
                 _tray_thread.start()
-            except Exception:
-                pass
+                return True
+            except Exception as exc:
+                print(f"[WootFlow] Failed to create tray icon: {exc}")
+                _tray_icon = None
+                _tray_thread = None
+                return False
 
-        # Criar a tray (se possível) e cancelar o fecho da janela
+        # Só esconder/cancelar fecho quando a tray existir de facto.
         try:
-            _create_tray()
-            return False
+            if _create_tray():
+                try:
+                    window.hide()
+                except Exception:
+                    pass
+                return False
+            _cleanup_sdk()
+            return True
         except Exception:
             # fallback: cleanup and allow close
             _cleanup_sdk()

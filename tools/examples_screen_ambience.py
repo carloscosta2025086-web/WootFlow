@@ -4,7 +4,7 @@ Demonstra os diferentes modos e configurações disponíveis
 """
 
 import time
-from utils.wooting_rgb import WootingRGB
+from utils.wooting_rgb import WootFlowRGB
 from core.screen_ambience_profile import load_ambience_profile
 
 
@@ -16,7 +16,7 @@ def example_1_basic_usage():
     
     # Conectar
     print("\n1. Conectando ao teclado...")
-    kb = WootingRGB()
+    kb = WootFlowRGB()
     print("   ✓ Teclado conectado")
     
     # Carregar perfil
@@ -46,7 +46,7 @@ def example_2_mode_switching():
     print("EXEMPLO 2: Switching de Modos")
     print("=" * 60)
     
-    kb = WootingRGB()
+    kb = WootFlowRGB()
     profile = load_ambience_profile(kb)
     
     modes = ["cinematic", "dynamic", "gaming"]
@@ -77,7 +77,7 @@ def example_3_brightness_control():
     print("EXEMPLO 3: Controle de Brilho")
     print("=" * 60)
     
-    kb = WootingRGB()
+    kb = WootFlowRGB()
     profile = load_ambience_profile(kb)
     profile.activate()
     
@@ -98,7 +98,7 @@ def example_4_long_running():
     print("EXEMPLO 4: Monitoramento de Performance")
     print("=" * 60)
     
-    kb = WootingRGB()
+    kb = WootFlowRGB()
     profile = load_ambience_profile(kb)
     
     print("\nMode: Dynamic (30 segundos de monitoramento)")
@@ -174,7 +174,7 @@ def example_6_interactive():
     print("EXEMPLO 6: Interface Interativa")
     print("=" * 60)
     
-    kb = WootingRGB()
+    kb = WootFlowRGB()
     profile = load_ambience_profile(kb)
     
     print("\nMenu interativo:")
