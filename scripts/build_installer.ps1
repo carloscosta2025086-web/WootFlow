@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.0.0-local",
+    [string]$Version = "3.1.4",
     [switch]$SkipUiBuild,
     [switch]$SkipExeBuild,
     [switch]$DownloadPrereqs,
