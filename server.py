@@ -77,10 +77,81 @@ except Exception:
 
 
 # ============================================================================
-# Scancode → SDK (row, col) para ISO PT 60HE
+# Tecla física (scancode) / VK → SDK (row, col)
 # ============================================================================
-# pynput devolve Key ou KeyCode. Mapeamos vk (virtual key) e Key enums
-# para posições físicas no SDK.
+# Priorizamos scancode para manter posição física correta entre layouts.
+# VK fica como fallback quando o scancode não está disponível.
+
+ACTIVE_KEYS = set(ALL_KEYS)
+
+SCANCODE_TO_SDK = {
+    # Row 1
+    0x01: (1, 0),   # Esc
+    0x02: (1, 1),   # 1
+    0x03: (1, 2),   # 2
+    0x04: (1, 3),   # 3
+    0x05: (1, 4),   # 4
+    0x06: (1, 5),   # 5
+    0x07: (1, 6),   # 6
+    0x08: (1, 7),   # 7
+    0x09: (1, 8),   # 8
+    0x0A: (1, 9),   # 9
+    0x0B: (1, 10),  # 0
+    0x0C: (1, 11),  # key between 0 and next symbol key
+    0x0D: (1, 12),  # key before backspace
+    0x0E: (1, 13),  # Backspace
+
+    # Row 2
+    0x0F: (2, 0),   # Tab
+    0x10: (2, 1),   # Q
+    0x11: (2, 2),   # W
+    0x12: (2, 3),   # E
+    0x13: (2, 4),   # R
+    0x14: (2, 5),   # T
+    0x15: (2, 6),   # Y
+    0x16: (2, 7),   # U
+    0x17: (2, 8),   # I
+    0x18: (2, 9),   # O
+    0x19: (2, 10),  # P
+    0x1A: (2, 11),  # key after P
+    0x1B: (2, 12),  # key before Enter area
+
+    # Row 3
+    0x3A: (3, 0),   # CapsLock
+    0x1E: (3, 1),   # A
+    0x1F: (3, 2),   # S
+    0x20: (3, 3),   # D
+    0x21: (3, 4),   # F
+    0x22: (3, 5),   # G
+    0x23: (3, 6),   # H
+    0x24: (3, 7),   # J
+    0x25: (3, 8),   # K
+    0x26: (3, 9),   # L
+    0x27: (3, 10),  # key after L
+    0x28: (3, 11),  # key after previous
+    0x29: (3, 12),  # key before Enter
+    0x1C: (3, 13),  # Enter
+
+    # Row 4
+    0x2A: (4, 0),   # LShift
+    0x56: (4, 1),   # ISO < key
+    0x2C: (4, 2),   # Z
+    0x2D: (4, 3),   # X
+    0x2E: (4, 4),   # C
+    0x2F: (4, 5),   # V
+    0x30: (4, 6),   # B
+    0x31: (4, 7),   # N
+    0x32: (4, 8),   # M
+    0x33: (4, 9),   # key after M
+    0x34: (4, 10),  # key after previous
+    0x35: (4, 11),  # key before RShift
+    0x36: (4, 13),  # RShift
+
+    # Row 5
+    0x1D: (5, 0),   # Ctrl (left; right via VK fallback)
+    0x38: (5, 2),   # Alt (left; right via VK fallback)
+    0x39: (5, 6),   # Space (center LED)
+}
 
 VK_TO_SDK = {
     # Row 1 — Number row
@@ -113,7 +184,6 @@ VK_TO_SDK = {
     0x50: (2, 10),  # P
     0xDB: (2, 11),  # [
     0xDD: (2, 12),  # ]
-    0xDC: (2, 13),  # \ (ISO: right of ])
 
     # Row 3 — Home row
     0x14: (3, 0),   # CapsLock
@@ -157,12 +227,48 @@ VK_TO_SDK = {
 }
 
 
+def _get_scancode(key) -> int | None:
+    """Extrai scancode físico do evento pynput (quando disponível)."""
+    for source in (key, getattr(key, "value", None)):
+        if source is None:
+            continue
+        for attr in ("scan_code", "scancode", "scan", "_scan"):
+            val = getattr(source, attr, None)
+            if isinstance(val, int):
+                # Alguns backends colocam flags no byte alto.
+                return val & 0xFF
+    return None
+
+
 def _get_vk(key) -> int | None:
     """Extrai virtual key code de um evento pynput."""
     if hasattr(key, "vk") and key.vk is not None:
         return key.vk
     if hasattr(key, "value") and hasattr(key.value, "vk"):
         return key.value.vk
+    return None
+
+
+def _get_key_pos(key) -> tuple[int, int] | None:
+    """Resolve posição SDK priorizando scancode (físico), depois VK."""
+    sc = _get_scancode(key)
+    if sc is not None:
+        mapped = SCANCODE_TO_SDK.get(sc)
+        if mapped in ACTIVE_KEYS:
+            return mapped
+
+    # Alguns layouts podem expor VK ambíguo para dead-keys;
+    # quando o char já vem resolvido, desambiguamos aqui.
+    key_char = getattr(key, "char", None)
+    if isinstance(key_char, str) and key_char == "~":
+        return (3, 12)
+
+    vk = _get_vk(key)
+    if vk is None:
+        return None
+    mapped = VK_TO_SDK.get(vk)
+    if mapped in ACTIVE_KEYS:
+        return mapped
     return None
 
 
@@ -550,10 +656,7 @@ class AppState:
         if not HAS_PYNPUT or self._kb_listener is not None:
             return
         def on_press(key):
-            vk = _get_vk(key)
-            if vk is None:
-                return
-            pos = VK_TO_SDK.get(vk)
+            pos = _get_key_pos(key)
             if pos is None:
                 return
             row, col = pos
