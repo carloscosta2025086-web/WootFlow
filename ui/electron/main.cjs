@@ -1,6 +1,7 @@
 const { app, BrowserWindow, shell } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
+const fs = require("fs");
 
 let mainWindow;
 let pythonProcess;
@@ -44,6 +45,10 @@ function startPythonServer() {
 }
 
 function createWindow() {
+  const windowsIcon = path.join(__dirname, "..", "..", "assets", "Wootflow_icon 256x256.ico");
+  const fallbackIcon = path.join(__dirname, "..", "..", "assets", "Wootflow_icon 128x128.ico");
+  const appIcon = fs.existsSync(windowsIcon) ? windowsIcon : fallbackIcon;
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -57,7 +62,7 @@ function createWindow() {
       height: 36,
     },
     backgroundColor: "#0a0a0f",
-    icon: path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'wootflow_icon.ico' : 'wootflow_icon_256x256.png'),
+    icon: appIcon,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

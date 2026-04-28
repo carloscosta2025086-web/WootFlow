@@ -31,10 +31,12 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
+CloseApplications=yes
+RestartApplications=no
 
 OutputDir={#RepoDir}\installer\output
 OutputBaseFilename=WootFlow-Setup-{#AppVersion}
-UninstallDisplayIcon={app}\assets\wootflow_icon.ico
+UninstallDisplayIcon={app}\assets\Wootflow_icon 256x256.ico
 DisableProgramGroupPage=yes
 ChangesEnvironment=no
 
@@ -53,9 +55,21 @@ Source: "{#RepoDir}\installer\prereqs\MicrosoftEdgeWebView2Setup.exe"; DestDir: 
 
 
 [Icons]
-Name: "{group}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\assets\wootflow_icon.ico"
-Name: "{group}\Desinstalar WootFlow"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\wootflow_icon.ico"
-Name: "{autodesktop}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\assets\wootflow_icon.ico"
+Name: "{group}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\assets\Wootflow_icon 256x256.ico"
+Name: "{group}\Desinstalar WootFlow"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\Wootflow_icon 256x256.ico"
+Name: "{autodesktop}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\assets\Wootflow_icon 256x256.ico"
+
+[UninstallRun]
+Filename: "{cmd}"; Parameters: "/C taskkill /F /T /IM {#MyAppExeName} >nul 2>nul"; Flags: runhidden waituntilterminated
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{localappdata}\WootFlow"
+Type: filesandordirs; Name: "{appdata}\WootFlow"
+Type: filesandordirs; Name: "{commonappdata}\WootFlow"
+Type: filesandordirs; Name: "{userdesktop}\WootFlow.lnk"
+Type: filesandordirs; Name: "{commondesktop}\WootFlow.lnk"
+Type: filesandordirs; Name: "{userprograms}\WootFlow"
+Type: filesandordirs; Name: "{commonprograms}\WootFlow"
 
 [Run]
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "A instalar Microsoft Visual C++ Redistributable..."; Flags: waituntilterminated; Check: NeedsVCRedist and FileExists(ExpandConstant('{tmp}\vc_redist.x64.exe'))

@@ -391,16 +391,9 @@ def _ensure_update_state_dir():
         os.makedirs(folder, exist_ok=True)
 
 
-def _should_check_updates(interval_hours: int = 12) -> bool:
-    try:
-        if not os.path.exists(_UPDATE_STATE_FILE):
-            return True
-        with open(_UPDATE_STATE_FILE, "r", encoding="utf-8") as f:
-            state = json.load(f)
-        last_check = float(state.get("last_check_epoch", 0))
-        return (time.time() - last_check) >= interval_hours * 3600
-    except Exception:
-        return True
+def _should_check_updates() -> bool:
+    # O utilizador quer verificacao imediata em cada arranque.
+    return True
 
 
 def _mark_update_checked():
