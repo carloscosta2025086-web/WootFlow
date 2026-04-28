@@ -28,8 +28,10 @@ except Exception:
 # Garantir que imports relativos funcionam no PyInstaller
 if getattr(sys, "frozen", False):
     _BASE = os.path.dirname(sys.executable)
+    _RESOURCE_BASE = getattr(sys, "_MEIPASS", _BASE)
 else:
     _BASE = os.path.dirname(os.path.abspath(__file__))
+    _RESOURCE_BASE = _BASE
 os.chdir(_BASE)
 
 def _resolve_log_path() -> str:
@@ -74,6 +76,7 @@ except Exception:
 _log = logging.getLogger("main_desktop")
 _log.info("=== WootFlow startup ===")
 _log.info("BASE=%s", _BASE)
+_log.info("RESOURCE_BASE=%s", _RESOURCE_BASE)
 _log.info("sys.frozen=%s", getattr(sys, 'frozen', False))
 _log.info("app_version=%s", APP_VERSION)
 
@@ -679,7 +682,7 @@ def main():
 
             # Usa o ícone empacotado no projeto.
             try:
-                icon_path = os.path.join(_BASE, "assets", "Wootflow_icon 256x256.ico")
+                icon_path = os.path.join(_RESOURCE_BASE, "assets", "Wootflow_icon 256x256.ico")
                 img = Image.open(icon_path)
             except Exception:
                 img = None
