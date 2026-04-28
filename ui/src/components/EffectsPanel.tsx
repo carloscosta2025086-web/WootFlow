@@ -9,9 +9,9 @@ interface Props {
 // Effect categories for visual grouping
 const CATEGORIES: Record<string, string[]> = {
   "Estáticas": ["solid_color", "gradient"],
-  "Ondas": ["rainbow_wave", "color_wave", "ocean", "aurora"],
+  "Ondas": ["rainbow_wave", "color_wave", "ocean", "aurora", "liquid_flow"],
   "Pulso": ["breathing", "spectrum_cycle", "heartbeat"],
-  "Reativas": ["reactive_typing", "ripple"],
+  "Reativas": ["reactive_typing", "ripple", "magnetic_keys", "jello"],
   "Partículas": ["raindrop", "sparkle", "starfield", "matrix_rain"],
   "Ambiente": ["fire", "lava", "screen_ambience"],
 };
@@ -22,6 +22,8 @@ export function EffectsPanel({ state, send }: Props) {
   };
 
   const effectMap = new Map(state.effects);
+  const magneticInfluence = state.effectParams?.magneticInfluence ?? 3.0;
+  const liquidDeform = state.effectParams?.liquidDeform ?? 0.55;
 
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2 custom-scroll">
@@ -83,6 +85,52 @@ export function EffectsPanel({ state, send }: Props) {
             className="accent-cyan-400"
           />
         </label>
+
+        {state.effect === "magnetic_keys" && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-400 flex justify-between">
+              Campo de Influência
+              <span className="text-accent-cyan">{magneticInfluence.toFixed(1)}</span>
+            </span>
+            <input
+              type="range"
+              min={12}
+              max={60}
+              value={Math.round(magneticInfluence * 10)}
+              onChange={(e) =>
+                send({
+                  action: "set_effect_param",
+                  param: "magneticInfluence",
+                  value: +e.target.value / 10,
+                })
+              }
+              className="accent-cyan-400"
+            />
+          </label>
+        )}
+
+        {state.effect === "liquid_flow" && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-400 flex justify-between">
+              Deformação por Input
+              <span className="text-accent-cyan">{liquidDeform.toFixed(2)}</span>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={150}
+              value={Math.round(liquidDeform * 100)}
+              onChange={(e) =>
+                send({
+                  action: "set_effect_param",
+                  param: "liquidDeform",
+                  value: +e.target.value / 100,
+                })
+              }
+              className="accent-cyan-400"
+            />
+          </label>
+        )}
 
         {/* Colors */}
         <div className="grid grid-cols-2 gap-4">

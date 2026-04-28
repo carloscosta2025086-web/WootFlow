@@ -269,6 +269,8 @@ class AppState:
         self.speed = 1.0
         self.color1 = (0, 255, 200)
         self.color2 = (255, 0, 100)
+        self.magnetic_influence = 3.0
+        self.liquid_deform = 0.55
 
         # Keyboard input listener (pynput)
         self._kb_listener = None
@@ -297,6 +299,8 @@ class AppState:
         self.speed = s.get("speed", self.speed)
         self.color1 = tuple(s.get("color1", list(self.color1)))
         self.color2 = tuple(s.get("color2", list(self.color2)))
+        self.magnetic_influence = float(s.get("magnetic_influence", self.magnetic_influence))
+        self.liquid_deform = float(s.get("liquid_deform", self.liquid_deform))
         self.current_effect_name = s.get("effect", self.current_effect_name)
         self.mode = s.get("mode", self.mode)
         log.info("Settings loaded: effect=%s brightness=%.0f%%",
@@ -383,6 +387,10 @@ class AppState:
                 self.current_effect.speed = self.speed
                 self.current_effect.color1 = self.color1
                 self.current_effect.color2 = self.color2
+                if hasattr(self.current_effect, "influence"):
+                    self.current_effect.influence = self.magnetic_influence
+                if hasattr(self.current_effect, "deform_strength"):
+                    self.current_effect.deform_strength = self.liquid_deform
                 self.mode = "effect"
             else:
                 ok = False
@@ -459,6 +467,8 @@ class AppState:
             "speed": self.speed,
             "color1": list(self.color1),
             "color2": list(self.color2),
+            "magnetic_influence": self.magnetic_influence,
+            "liquid_deform": self.liquid_deform,
             "effect": self.current_effect_name,
             "mode": self.mode,
         })
@@ -716,6 +726,10 @@ class AppState:
             "speed": self.speed,
             "color1": list(self.color1),
             "color2": list(self.color2),
+            "effectParams": {
+                "magneticInfluence": self.magnetic_influence,
+                "liquidDeform": self.liquid_deform,
+            },
             "audioRunning": self.audio_running,
             "audioAvailable": AudioReactive.available(),
             "pynputAvailable": HAS_PYNPUT,
@@ -984,6 +998,24 @@ async def handle_message(ws: WebSocket, msg: dict):
             state.current_effect.color2 = state.color2
         state.save_settings()
         await broadcast(state.get_state_dict())
+
+    elif action == "set_effect_param":
+        param = str(msg.get("param", "")).strip()
+        value = float(msg.get("value", 0.0))
+
+        if param == "magneticInfluence":
+            state.magnetic_influence = max(1.2, min(6.0, value))
+            if state.current_effect and hasattr(state.current_effect, "influence"):
+                state.current_effect.influence = state.magnetic_influence
+            state.save_settings()
+            await broadcast(state.get_state_dict())
+
+        elif param == "liquidDeform":
+            state.liquid_deform = max(0.0, min(1.5, value))
+            if state.current_effect and hasattr(state.current_effect, "deform_strength"):
+                state.current_effect.deform_strength = state.liquid_deform
+            state.save_settings()
+            await broadcast(state.get_state_dict())
 
     elif action == "set_perkey":
         row = int(msg.get("row", 0))

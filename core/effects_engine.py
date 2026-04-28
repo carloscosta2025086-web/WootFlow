@@ -376,7 +376,7 @@ class StarfieldEffect(Effect):
             self._stars[(r, c)] = {
                 "phase": random.uniform(0, math.pi * 2),
                 "freq": random.uniform(0.5, 3.0),
-                "max_bright": random.uniform(0.3, 1.0),
+                "max_bright": random.uniform(0.55, 1.0),
             }
         self.color1 = (180, 200, 255)
         self._bg = (2, 2, 8)
@@ -613,11 +613,244 @@ class OceanEffect(Effect):
             wave3 = math.sin(ts * 0.5 + col * 0.15 + row * 0.6) * 0.5 + 0.5
             val = (wave1 + wave2 + wave3) / 3.0
 
-            r = int(10 * val)
-            g = int(80 + 120 * val)
-            b = int(150 + 105 * val)
+            r = int(20 + 55 * val)
+            g = int(105 + 140 * val)
+            b = int(165 + 90 * val)
             r, g, b = scale_color((r, g, b), self.brightness)
             kb.array_set_single(row, col, r, g, b)
+        kb.array_update()
+
+
+class MagneticKeysEffect(Effect):
+    """Teclas ativas puxam cor para teclas vizinhas com campo de influencia."""
+    name = "Magnetic Keys"
+
+    def __init__(self):
+        super().__init__()
+        self.speed = 1.2
+        self.influence = 3.0
+        self._falloff = 1.5
+        self._bg_mix = 0.42
+        self._sources = []  # [(row, col, start_time)]
+        self._lock = threading.Lock()
+
+    def trigger(self, row: int, col: int):
+        with self._lock:
+            self._sources.append((row, col, time.time()))
+            if len(self._sources) > 28:
+                self._sources = self._sources[-28:]
+
+    def _base_color(self, row: int, col: int, t: float) -> tuple[int, int, int]:
+        grad = col / 13.0
+        wave = (math.sin(t * 0.7 * self.speed + row * 0.5 + col * 0.25) + 1.0) * 0.5
+        blend = max(0.0, min(1.0, grad * 0.7 + wave * 0.3))
+        return lerp_color(self.color1, self.color2, blend)
+
+    def update(self, kb: WootFlowRGB, t: float):
+        with self._lock:
+            alive = []
+            for sr, sc, st in self._sources:
+                if t - st < 1.8:
+                    alive.append((sr, sc, st))
+            self._sources = alive
+            sources = list(alive)
+
+        radius = max(1.2, float(self.influence))
+
+        for row, col in ALL_KEYS:
+            base = self._base_color(row, col, t)
+            acc_r = base[0] * self._bg_mix
+            acc_g = base[1] * self._bg_mix
+            acc_b = base[2] * self._bg_mix
+            total = self._bg_mix
+
+            for sr, sc, st in sources:
+                age = t - st
+                dist = math.sqrt((row - sr) ** 2 + (col - sc) ** 2)
+                if dist > radius:
+                    continue
+
+                life = max(0.0, 1.0 - age / 1.8)
+                pull = max(0.0, 1.0 - dist / radius)
+                weight = (pull ** self._falloff) * life * (0.7 + 0.6 * self.speed)
+
+                source_base = self._base_color(sr, sc, t - age * 0.3)
+                tint = lerp_color(source_base, self.color1, 0.5)
+                acc_r += tint[0] * weight
+                acc_g += tint[1] * weight
+                acc_b += tint[2] * weight
+                total += weight
+
+            r = int(acc_r / total)
+            g = int(acc_g / total)
+            b = int(acc_b / total)
+            # Pequeno boost para evitar sensação de "apagado" em brilho máximo.
+            if self.brightness > 0.95:
+                r, g, b = scale_color((r, g, b), 1.1)
+            r, g, b = scale_color((r, g, b), self.brightness)
+            kb.array_set_single(row, col, r, g, b)
+
+        kb.array_update()
+
+
+class LiquidFlowEffect(Effect):
+    """Gradiente fluido animado que deforma em torno das teclas pressionadas."""
+    name = "Liquid Flow"
+
+    def __init__(self):
+        super().__init__()
+        self.speed = 1.0
+        self.deform_strength = 0.55
+        self._ripples = []  # [(row, col, start_time)]
+        self._lock = threading.Lock()
+        self._ripple_life = 2.35
+        self._ripple_radius = 6.2
+
+    def trigger(self, row: int, col: int):
+        with self._lock:
+            self._ripples.append((row, col, time.time()))
+            if len(self._ripples) > 24:
+                self._ripples = self._ripples[-24:]
+
+    def update(self, kb: WootFlowRGB, t: float):
+        with self._lock:
+            active = []
+            for rr, rc, st in self._ripples:
+                if t - st < self._ripple_life:
+                    active.append((rr, rc, st))
+            self._ripples = active
+
+        base_speed = max(0.15, self.speed)
+        deform = max(0.0, min(1.5, float(self.deform_strength)))
+
+        for row, col in ALL_KEYS:
+            x = col / 13.0
+            y = row / max(1, WOOTING_RGB_ROWS - 1)
+
+            # Campo de fluxo base com movimento lento e contínuo (corrente líquida).
+            flow_x = x + math.sin((y * 7.2) + t * 1.45 * base_speed) * 0.06
+            flow_y = y + math.sin((x * 6.6) - t * 1.25 * base_speed) * 0.05
+
+            # Usado para brilho de interferência (caústica) após perturbações.
+            ripple_energy = 0.0
+
+            # Perturbação tipo água: frente de onda radial amortecida + pequena refração.
+            for rr, rc, st in active:
+                age = t - st
+                dx = col - rc
+                dy = row - rr
+                dist = math.sqrt(dx * dx + dy * dy) + 1e-6
+                if dist > self._ripple_radius:
+                    continue
+
+                life = max(0.0, 1.0 - age / self._ripple_life)
+                radial_falloff = max(0.0, 1.0 - dist / self._ripple_radius)
+
+                # Frente de onda desloca-se para fora como ondulação de água.
+                wave_front = age * (2.3 + 0.45 * base_speed)
+                phase = (dist - wave_front) * 5.4
+                ring = math.sin(phase)
+
+                # Amortecimento físico aproximado: cai com tempo e distância.
+                damping = life * life * (radial_falloff ** 1.6)
+                amplitude = deform * 0.085 * damping
+
+                # Vetor radial (empurra/puxa conforme fase da onda).
+                nx = dx / dist
+                ny = dy / dist
+                flow_x += nx * ring * amplitude
+                flow_y += ny * ring * amplitude
+
+                # Pequena componente tangencial para dar "twist" suave de fluido.
+                tangent = math.cos(phase * 0.75 + age * 1.4) * amplitude * 0.28
+                flow_x += -ny * tangent
+                flow_y += nx * tangent
+
+                ripple_energy += abs(ring) * damping
+
+            f1 = math.sin((flow_x * 8.0 + flow_y * 4.0) + t * 1.9 * base_speed)
+            f2 = math.sin((flow_x * 3.4 - flow_y * 7.1) - t * 1.35 * base_speed)
+            f3 = math.sin((flow_x * 10.3 + flow_y * 2.4) + t * 0.9 * base_speed)
+            mix = max(0.0, min(1.0, (f1 * 0.44 + f2 * 0.36 + f3 * 0.20 + 1.0) * 0.5))
+
+            r, g, b = lerp_color(self.color1, self.color2, mix)
+
+            # Brilho dinâmico com realce em zonas de interferência (efeito água viva).
+            caustic = max(0.0, min(1.0, ripple_energy * 0.9))
+            highlight = 0.9 + 0.18 * math.sin((flow_x + flow_y) * 8.3 + t * 2.2) + (0.22 * caustic)
+            r, g, b = scale_color((r, g, b), self.brightness * max(0.2, highlight))
+            kb.array_set_single(row, col, r, g, b)
+
+        kb.array_update()
+
+
+class JelloEffect(Effect):
+    """Efeito elástico estilo jello: perturbação com oscilação amortecida."""
+    name = "Jello"
+
+    def __init__(self):
+        super().__init__()
+        self.speed = 1.0
+        self._events = []  # [(row, col, start_time)]
+        self._event_life = 1.6
+        self._radius = 5.6
+        self._lock = threading.Lock()
+
+    def trigger(self, row: int, col: int):
+        with self._lock:
+            self._events.append((row, col, time.time()))
+            if len(self._events) > 36:
+                self._events = self._events[-36:]
+
+    def update(self, kb: WootFlowRGB, t: float):
+        with self._lock:
+            alive = []
+            for er, ec, st in self._events:
+                if t - st < self._event_life:
+                    alive.append((er, ec, st))
+            self._events = alive
+
+        base_speed = max(0.2, float(self.speed))
+
+        for row, col in ALL_KEYS:
+            x = col / 13.0
+            y = row / max(1, WOOTING_RGB_ROWS - 1)
+
+            # Base gelatinosa suave para manter movimento mesmo sem input.
+            wobble = (
+                math.sin((x * 10.0) + t * 2.0 * base_speed)
+                + math.sin((y * 12.0) - t * 1.7 * base_speed)
+                + math.sin(((x + y) * 8.5) + t * 1.3 * base_speed)
+            ) / 3.0
+
+            distortion = wobble * 0.22
+            impulse = 0.0
+
+            for er, ec, st in alive:
+                age = t - st
+                dx = col - ec
+                dy = row - er
+                dist = math.sqrt(dx * dx + dy * dy)
+                if dist > self._radius:
+                    continue
+
+                life = max(0.0, 1.0 - age / self._event_life)
+                radial = max(0.0, 1.0 - dist / self._radius)
+
+                # Oscilação amortecida: dá aquele "abanão" elástico.
+                osc = math.sin((dist * 2.6) - age * 13.0 * base_speed)
+                ring = osc * (life ** 1.35) * (radial ** 1.8)
+                distortion += ring * 0.85
+                impulse += abs(ring)
+
+            blend = max(0.0, min(1.0, 0.5 + distortion * 0.5))
+            r, g, b = lerp_color(self.color1, self.color2, blend)
+
+            # Realce rápido nas zonas onde o gel "treme" mais.
+            shine = 0.92 + min(0.35, impulse * 0.42)
+            r, g, b = scale_color((r, g, b), self.brightness * shine)
+            kb.array_set_single(row, col, r, g, b)
+
         kb.array_update()
 
 
@@ -727,6 +960,9 @@ EFFECTS = {
     "heartbeat": HeartbeatEffect,
     "lava": LavaEffect,
     "ocean": OceanEffect,
+    "liquid_flow": LiquidFlowEffect,
+    "magnetic_keys": MagneticKeysEffect,
+    "jello": JelloEffect,
 }
 
 EFFECT_NAMES = {
@@ -747,4 +983,7 @@ EFFECT_NAMES = {
     "heartbeat": "Heartbeat",
     "lava": "Lava",
     "ocean": "Ocean",
+    "liquid_flow": "Liquid Flow",
+    "magnetic_keys": "Magnetic Keys",
+    "jello": "Jello",
 }

@@ -7,6 +7,10 @@ export interface AppState {
   speed: number;
   color1: number[];
   color2: number[];
+  effectParams?: {
+    magneticInfluence?: number;
+    liquidDeform?: number;
+  };
   audioRunning: boolean;
   audioAvailable: boolean;
   pynputAvailable: boolean;
