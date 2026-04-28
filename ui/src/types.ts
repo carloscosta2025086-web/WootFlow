@@ -49,6 +49,7 @@ export interface RGB {
 export interface KeyDef {
   row: number; // SDK row (1-5)
   col: number; // SDK col
+  visualRow?: number; // optional visual row override for preview-only placement
   x: number;   // visual x position (units)
   w: number;   // width (units)
   label: string;

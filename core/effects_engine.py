@@ -62,21 +62,21 @@ def scale_color(color: tuple, factor: float) -> tuple[int, int, int]:
 # O SDK usa uma matrix 6x21. Para o 60HE (sem row de F-keys):
 #   - Row 0 do SDK = F-keys (não existe no 60HE)
 #   - Row 1 = Number row (ESC, 1-0, -, =, Backspace)
-#   - Row 2 = Tab row (Tab, Q-P, [, ], \)
+#   - Row 2 = Tab row (Tab, Q-P, +, ´)
 #   - Row 3 = Home row (Caps, A-L, ;, ', #, Enter)
 #   - Row 4 = Shift row (LShift, ISO<, Z-/, RShift)
-#   - Row 5 = Bottom row (LCtrl, Win, Alt, Space, AltGr, Menu, RCtrl, Fn)
+#   - Row 5 = Bottom row (LCtrl, Win, Alt, Space LEDs centrais, AltGr, Menu, RCtrl, Fn)
 PHYSICAL_KEYS_60HE = [
     # Row 1 (SDK): ESC, 1-0, ', «, BACKSPACE
     [(1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13)],
-    # Row 2 (SDK): TAB, Q-P, +, ´, Enter top (ISO)
-    [(2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9), (2, 10), (2, 11), (2, 12), (2, 13)],
+    # Row 2 (SDK): TAB, Q-P, +, ´
+    [(2, 0), (2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9), (2, 10), (2, 11), (2, 12)],
     # Row 3 (SDK): CAPS, A-L, Ç, º, ~, ENTER
     [(3, 0), (3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9), (3, 10), (3, 11), (3, 12), (3, 13)],
     # Row 4 (SDK): LSHIFT, ISO<, Z-/, RSHIFT  (col 12 = NOLED)
     [(4, 0), (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (4, 6), (4, 7), (4, 8), (4, 9), (4, 10), (4, 11), (4, 13)],
-    # Row 5 (SDK): LCTRL, LWIN, LALT, SPACE LEDs (3-9), ALTGR, MENU, RCTRL, FN
-    [(5, 0), (5, 1), (5, 2), (5, 3), (5, 4), (5, 5), (5, 6), (5, 7), (5, 8), (5, 9), (5, 10), (5, 11), (5, 12), (5, 13)],
+    # Row 5 (SDK): LCTRL, LWIN, LALT, SPACE LEDs (4-8), ALTGR, MENU, RCTRL, FN
+    [(5, 0), (5, 1), (5, 2), (5, 4), (5, 5), (5, 6), (5, 7), (5, 8), (5, 10), (5, 11), (5, 12), (5, 13)],
 ]
 
 ALL_KEYS = [(r, c) for row in PHYSICAL_KEYS_60HE for r, c in row]
@@ -116,11 +116,10 @@ class RainbowWaveEffect(Effect):
 
     def update(self, kb: WootFlowRGB, t: float):
         offset = t * self.speed
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                hue = (offset + col * self.spread + row * 8) % 360
-                r, g, b = hsv_to_rgb(hue, 1.0, self.brightness)
-                kb.array_set_single(row, col, r, g, b)
+        for row, col in ALL_KEYS:
+            hue = (offset + col * self.spread + row * 8) % 360
+            r, g, b = hsv_to_rgb(hue, 1.0, self.brightness)
+            kb.array_set_single(row, col, r, g, b)
         kb.array_update()
 
 
@@ -135,14 +134,13 @@ class ColorWaveEffect(Effect):
         self.color2 = (128, 0, 255)
 
     def update(self, kb: WootFlowRGB, t: float):
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                wave = (math.sin(t * self.speed + col * 0.5 + row * 0.3) + 1) / 2
-                r, g, b = lerp_color(self.color1, self.color2, wave)
-                r = min(255, int(r * self.brightness))
-                g = min(255, int(g * self.brightness))
-                b = min(255, int(b * self.brightness))
-                kb.array_set_single(row, col, r, g, b)
+        for row, col in ALL_KEYS:
+            wave = (math.sin(t * self.speed + col * 0.5 + row * 0.3) + 1) / 2
+            r, g, b = lerp_color(self.color1, self.color2, wave)
+            r = min(255, int(r * self.brightness))
+            g = min(255, int(g * self.brightness))
+            b = min(255, int(b * self.brightness))
+            kb.array_set_single(row, col, r, g, b)
         kb.array_update()
 
 
@@ -162,9 +160,8 @@ class BreathingEffect(Effect):
         r = min(255, int(self.color1[0] * intensity))
         g = min(255, int(self.color1[1] * intensity))
         b = min(255, int(self.color1[2] * intensity))
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                kb.array_set_single(row, col, r, g, b)
+        for row, col in ALL_KEYS:
+            kb.array_set_single(row, col, r, g, b)
         kb.array_update()
 
 
@@ -179,9 +176,8 @@ class SpectrumCycleEffect(Effect):
     def update(self, kb: WootFlowRGB, t: float):
         hue = (t * self.speed) % 360
         r, g, b = hsv_to_rgb(hue, 1.0, self.brightness)
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                kb.array_set_single(row, col, r, g, b)
+        for row, col in ALL_KEYS:
+            kb.array_set_single(row, col, r, g, b)
         kb.array_update()
 
 
@@ -209,9 +205,8 @@ class RippleEffect(Effect):
 
     def update(self, kb: WootFlowRGB, t: float):
         # Base escura
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                kb.array_set_single(row, col, *self._bg)
+        for row, col in ALL_KEYS:
+            kb.array_set_single(row, col, *self._bg)
 
         with self._lock:
             active = []
@@ -222,22 +217,21 @@ class RippleEffect(Effect):
             self._ripples = active
 
             # Aplicar cada ripple
-            for row in range(WOOTING_RGB_ROWS):
-                for col in range(14):
-                    max_intensity = 0.0
-                    for cr, cc, st in active:
-                        age = t - st
-                        radius = age * self.speed
-                        dist = math.sqrt((row - cr) ** 2 + (col - cc) ** 2)
-                        ring_dist = abs(dist - radius)
-                        if ring_dist < 1.5:
-                            fade = max(0, 1.0 - age * self.fade_speed / self.max_radius)
-                            intensity = (1.0 - ring_dist / 1.5) * fade
-                            max_intensity = max(max_intensity, intensity)
+            for row, col in ALL_KEYS:
+                max_intensity = 0.0
+                for cr, cc, st in active:
+                    age = t - st
+                    radius = age * self.speed
+                    dist = math.sqrt((row - cr) ** 2 + (col - cc) ** 2)
+                    ring_dist = abs(dist - radius)
+                    if ring_dist < 1.5:
+                        fade = max(0, 1.0 - age * self.fade_speed / self.max_radius)
+                        intensity = (1.0 - ring_dist / 1.5) * fade
+                        max_intensity = max(max_intensity, intensity)
 
-                    if max_intensity > 0:
-                        r, g, b = scale_color(self.color1, max_intensity * self.brightness)
-                        kb.array_set_single(row, col, r, g, b)
+                if max_intensity > 0:
+                    r, g, b = scale_color(self.color1, max_intensity * self.brightness)
+                    kb.array_set_single(row, col, r, g, b)
 
         kb.array_update()
 
@@ -263,15 +257,14 @@ class ReactiveTypingEffect(Effect):
         with self._lock:
             keys = dict(self._key_times)
 
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                press_t = keys.get((row, col))
-                if press_t and t - press_t < self.fade_time:
-                    fade = 1.0 - (t - press_t) / self.fade_time
-                    r, g, b = scale_color(self.color1, fade * self.brightness)
-                    kb.array_set_single(row, col, r, g, b)
-                else:
-                    kb.array_set_single(row, col, *self._bg)
+        for row, col in ALL_KEYS:
+            press_t = keys.get((row, col))
+            if press_t and t - press_t < self.fade_time:
+                fade = 1.0 - (t - press_t) / self.fade_time
+                r, g, b = scale_color(self.color1, fade * self.brightness)
+                kb.array_set_single(row, col, r, g, b)
+            else:
+                kb.array_set_single(row, col, *self._bg)
 
         kb.array_update()
 
@@ -305,19 +298,18 @@ class FireEffect(Effect):
                 self._heat[row][col] = max(0, avg - 0.08 - random.uniform(0, 0.05))
 
         # Mapear calor para cores (preto → vermelho → amarelo → branco)
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                h = self._heat[row][col] * self.brightness
-                if h < 0.33:
-                    t2 = h / 0.33
-                    r, g, b = int(200 * t2), 0, 0
-                elif h < 0.66:
-                    t2 = (h - 0.33) / 0.33
-                    r, g, b = 200, int(150 * t2), 0
-                else:
-                    t2 = (h - 0.66) / 0.34
-                    r, g, b = 200 + int(55 * t2), 150 + int(105 * t2), int(80 * t2)
-                kb.array_set_single(row, col, min(255, r), min(255, g), min(255, b))
+        for row, col in ALL_KEYS:
+            h = self._heat[row][col] * self.brightness
+            if h < 0.33:
+                t2 = h / 0.33
+                r, g, b = int(200 * t2), 0, 0
+            elif h < 0.66:
+                t2 = (h - 0.33) / 0.33
+                r, g, b = 200, int(150 * t2), 0
+            else:
+                t2 = (h - 0.66) / 0.34
+                r, g, b = 200 + int(55 * t2), 150 + int(105 * t2), int(80 * t2)
+            kb.array_set_single(row, col, min(255, r), min(255, g), min(255, b))
 
         kb.array_update()
 
@@ -347,19 +339,18 @@ class MatrixRainEffect(Effect):
                 self._drops[col] = random.uniform(-4, -1)
                 self._speeds[col] = random.uniform(1.5, 4.0)
 
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                dist = self._drops[col] - row
-                if 0 <= dist < 1:
-                    # Head (branco/verde brilhante)
-                    r, g, b = scale_color((200, 255, 200), self.brightness)
-                elif 0 < dist < 5:
-                    # Trail
-                    fade = 1.0 - dist / 5.0
-                    r, g, b = scale_color(self.color1, fade * self.brightness)
-                else:
-                    r, g, b = 0, min(255, int(15 * self.brightness)), 0
-                kb.array_set_single(row, col, r, g, b)
+        for row, col in ALL_KEYS:
+            dist = self._drops[col] - row
+            if 0 <= dist < 1:
+                # Head (branco/verde brilhante)
+                r, g, b = scale_color((200, 255, 200), self.brightness)
+            elif 0 < dist < 5:
+                # Trail
+                fade = 1.0 - dist / 5.0
+                r, g, b = scale_color(self.color1, fade * self.brightness)
+            else:
+                r, g, b = 0, min(255, int(15 * self.brightness)), 0
+            kb.array_set_single(row, col, r, g, b)
 
         kb.array_update()
 
@@ -382,19 +373,18 @@ class StarfieldEffect(Effect):
         self._bg = (2, 2, 8)
 
     def update(self, kb: WootFlowRGB, t: float):
-        for row in range(WOOTING_RGB_ROWS):
-            for col in range(14):
-                star = self._stars.get((row, col))
-                if star:
-                    val = (math.sin(t * star["freq"] * self.speed + star["phase"]) + 1) / 2
-                    val = val * star["max_bright"] * self.brightness
-                    if val < 0.1:
-                        kb.array_set_single(row, col, *self._bg)
-                    else:
-                        r, g, b = scale_color(self.color1, val)
-                        kb.array_set_single(row, col, r, g, b)
-                else:
+        for row, col in ALL_KEYS:
+            star = self._stars.get((row, col))
+            if star:
+                val = (math.sin(t * star["freq"] * self.speed + star["phase"]) + 1) / 2
+                val = val * star["max_bright"] * self.brightness
+                if val < 0.1:
                     kb.array_set_single(row, col, *self._bg)
+                else:
+                    r, g, b = scale_color(self.color1, val)
+                    kb.array_set_single(row, col, r, g, b)
+            else:
+                kb.array_set_single(row, col, *self._bg)
         kb.array_update()
 
 

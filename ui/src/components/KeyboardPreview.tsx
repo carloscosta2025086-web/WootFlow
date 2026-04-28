@@ -34,7 +34,9 @@ const LAYOUT: KeyDef[] = [
   { row: 2, col: 10, x: 10.5, w: 1, label: "P" },
   { row: 2, col: 11, x: 11.5, w: 1, label: "+" },
   { row: 2, col: 12, x: 12.5, w: 1, label: "´" },
-  // Enter spans row 2 col 13 + row 3 col 13 (ISO L-shape, shown as rectangle on row 3)
+  // ANSI-style Enter fills the right-side gap on the top row.
+  // Keep SDK mapping on row 3/col 13 for backend compatibility.
+  { row: 3, col: 13, visualRow: 2, x: 13.5, w: 1.5, label: "↵" },
 
   // Row 3 — Home row
   { row: 3, col: 0, x: 0, w: 1.75, label: "Caps" },
@@ -50,7 +52,6 @@ const LAYOUT: KeyDef[] = [
   { row: 3, col: 10, x: 10.75, w: 1, label: "Ç" },
   { row: 3, col: 11, x: 11.75, w: 1, label: "º" },
   { row: 3, col: 12, x: 12.75, w: 1, label: "~" },
-  { row: 3, col: 13, x: 13.75, w: 1.25, label: "↵" },
 
   // Row 4 — Shift row (ISO: col1 = <, Z at col2)
   { row: 4, col: 0, x: 0, w: 1.25, label: "Shift" },
@@ -71,14 +72,12 @@ const LAYOUT: KeyDef[] = [
   { row: 5, col: 0, x: 0, w: 1.25, label: "Ctrl" },
   { row: 5, col: 1, x: 1.25, w: 1.25, label: "Win" },
   { row: 5, col: 2, x: 2.5, w: 1.25, label: "Alt" },
-  // Spacebar — 7 individual LEDs (cols 3-9), switch at col 6
-  { row: 5, col: 3, x: 3.75, w: 0.893, label: "" },
-  { row: 5, col: 4, x: 4.643, w: 0.893, label: "" },
-  { row: 5, col: 5, x: 5.536, w: 0.893, label: "" },
-  { row: 5, col: 6, x: 6.429, w: 0.893, label: "" },
-  { row: 5, col: 7, x: 7.321, w: 0.893, label: "" },
-  { row: 5, col: 8, x: 8.214, w: 0.893, label: "" },
-  { row: 5, col: 9, x: 9.107, w: 0.893, label: "" },
+  // Spacebar — 5 individual LEDs mapped to the center of SDK space range (cols 4-8)
+  { row: 5, col: 4, x: 3.75, w: 1.25, label: "" },
+  { row: 5, col: 5, x: 5, w: 1.25, label: "" },
+  { row: 5, col: 6, x: 6.25, w: 1.25, label: "" },
+  { row: 5, col: 7, x: 7.5, w: 1.25, label: "" },
+  { row: 5, col: 8, x: 8.75, w: 1.25, label: "" },
   { row: 5, col: 10, x: 10, w: 1.25, label: "AltGr" },
   { row: 5, col: 11, x: 11.25, w: 1.25, label: "Menu" },
   { row: 5, col: 12, x: 12.5, w: 1.25, label: "Ctrl" },
@@ -131,7 +130,7 @@ export function KeyboardPreview({
     ctx.clearRect(0, 0, totalW, totalH);
 
     for (const key of LAYOUT) {
-      const visualRow = key.row - 1; // SDK rows 1-5 → visual rows 0-4
+      const visualRow = (key.visualRow ?? key.row) - 1; // SDK rows 1-5 → visual rows 0-4
       const x = PAD + key.x * UNIT + GAP / 2;
       const y = PAD + visualRow * UNIT + GAP / 2;
       const w = key.w * UNIT - GAP;
@@ -189,7 +188,7 @@ export function KeyboardPreview({
     const my = e.clientY - rect.top;
 
     for (const key of LAYOUT) {
-      const vr = key.row - 1;
+      const vr = (key.visualRow ?? key.row) - 1;
       const x = PAD + key.x * UNIT + GAP / 2;
       const y = PAD + vr * UNIT + GAP / 2;
       const w = key.w * UNIT - GAP;
