@@ -64,7 +64,7 @@ Filename: "{cmd}"; Parameters: "/C taskkill /F /T /IM {#MyAppExeName} >nul 2>nul
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{localappdata}\WootFlow"
-Type: filesandordirs; Name: "{appdata}\WootFlow"
+Type: filesandordirs; Name: "{userappdata}\WootFlow"
 Type: filesandordirs; Name: "{commonappdata}\WootFlow"
 Type: filesandordirs; Name: "{userdesktop}\WootFlow.lnk"
 Type: filesandordirs; Name: "{commondesktop}\WootFlow.lnk"

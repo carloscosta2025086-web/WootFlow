@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "3.1.4",
+    [string]$Version = "3.2.1",
     [switch]$SkipUiBuild,
     [switch]$SkipExeBuild,
     [switch]$DownloadPrereqs,
@@ -68,7 +68,7 @@ try {
     Write-Host "[3/4] Localizar Inno Setup Compiler" -ForegroundColor Cyan
     $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
     if (-not $iscc) {
-        $candidate = "C:\Users\bl4z3\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
+        $candidate = Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"
         if (Test-Path $candidate) {
             $iscc = $candidate
         }
