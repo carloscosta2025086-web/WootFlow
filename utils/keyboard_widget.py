@@ -5,7 +5,6 @@ clicável para edição individual de teclas.
 """
 
 import customtkinter as ctk
-import math
 
 
 # ============================================================================

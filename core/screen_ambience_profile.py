@@ -5,15 +5,13 @@ Permite usar Screen Ambience como um perfil ativo no sistema principal.
 
 import json
 import os
-import time
 from collections import defaultdict
 from typing import Optional, Dict, Any, Iterable, List, Tuple
 from utils.wooting_rgb import WootFlowRGB, WOOTING_RGB_ROWS, WOOTING_RGB_COLS
 from core.effects_engine import ALL_KEYS
 from core.screen_ambience import (
     ScreenAmbienceEngine, 
-    ScreenAmbienceConfig, 
-    create_ambience_engine
+    ScreenAmbienceConfig
 )
 
 
