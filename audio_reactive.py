@@ -6,7 +6,6 @@ em dados de frequência usando FFT para efeito equalizer no teclado.
 
 import threading
 import time
-import math
 import logging
 
 try:
@@ -27,6 +26,8 @@ except ImportError:
 # ============================================================================
 BLOCK_SIZE = 1024
 NUM_BANDS = 14     # Número de bandas de frequência (colunas do 60HE)
+MAX_VALID_SAMPLE = 4.0
+SILENCE_RMS_GATE = 0.004
 
 
 log = logging.getLogger("wooting.audio")
@@ -112,6 +113,11 @@ class AudioReactive:
         self._device_name = loopback["name"].replace(" [Loopback]", "")
         self._channels = loopback["maxInputChannels"]
         self._sample_rate = int(loopback["defaultSampleRate"])
+
+        with self._lock:
+            self._bands = [0.0] * NUM_BANDS
+            self._peak = [0.0] * NUM_BANDS
+            self._volume = 0.0
 
         self._running = True
         self._thread = threading.Thread(
@@ -224,15 +230,38 @@ class AudioReactive:
 
     def _process_audio(self, data: "np.ndarray", sr: int):
         """Processa o bloco de áudio: FFT → bandas de frequência."""
+        if data.size == 0:
+            return
+
         # Converter para mono se stereo
         if self._channels > 1:
             mono = data.reshape(-1, self._channels).mean(axis=1)
         else:
             mono = data
 
+        # Sanitizar amostras inválidas para evitar picos falsos no arranque.
+        mono = np.nan_to_num(mono, nan=0.0, posinf=0.0, neginf=0.0)
+        peak_abs = float(np.max(np.abs(mono)))
+        if peak_abs > MAX_VALID_SAMPLE:
+            # Frame corrompido/inválido: ignora para não acender barras sem som.
+            mono = np.zeros_like(mono)
+        else:
+            mono = np.clip(mono, -1.0, 1.0)
+
         # Volume RMS
-        rms = float(np.sqrt(np.mean(mono ** 2)))
+        mono64 = mono.astype(np.float64, copy=False)
+        rms = float(np.sqrt(np.mean(mono64 * mono64)))
         volume = min(1.0, rms * self.sensitivity * 10)
+
+        if rms < SILENCE_RMS_GATE:
+            with self._lock:
+                for i in range(NUM_BANDS):
+                    self._bands[i] = 0.0
+                    self._peak[i] *= self.peak_decay
+                    if self._peak[i] < self.noise_floor:
+                        self._peak[i] = 0.0
+                self._volume = 0.0
+            return
 
         # Aplicar janela de Hanning antes do FFT
         windowed = mono * np.hanning(len(mono))
