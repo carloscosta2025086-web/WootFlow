@@ -7,6 +7,7 @@ em dados de frequência usando FFT para efeito equalizer no teclado.
 import threading
 import time
 import math
+import logging
 
 try:
     import numpy as np
@@ -28,6 +29,9 @@ BLOCK_SIZE = 1024
 NUM_BANDS = 14     # Número de bandas de frequência (colunas do 60HE)
 
 
+log = logging.getLogger("wooting.audio")
+
+
 class AudioReactive:
     """
     Captura áudio do sistema via WASAPI loopback e calcula bandas de
@@ -38,6 +42,7 @@ class AudioReactive:
     def __init__(self):
         self._running = False
         self._thread = None
+        self._cleanup_thread = None
         self._pa = None
         self._stream = None
         self._lock = threading.Lock()
@@ -96,6 +101,9 @@ class AudioReactive:
             return False
         if self._running:
             return True
+        cleanup_thread = self._cleanup_thread
+        if cleanup_thread and cleanup_thread.is_alive():
+            cleanup_thread.join(timeout=0.5)
 
         loopback = self._find_loopback()
         if loopback is None:
@@ -114,30 +122,50 @@ class AudioReactive:
         self._thread.start()
         return True
 
+    def _close_audio_resources(self, stream, pa, thread):
+        if stream is not None:
+            try:
+                stream.stop_stream()
+            except Exception:
+                pass
+
+        if thread is not None:
+            thread.join(timeout=5)
+            if thread.is_alive():
+                log.warning("Audio capture thread did not stop within timeout")
+                return
+
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception:
+                pass
+
+        if pa is not None:
+            try:
+                pa.terminate()
+            except Exception:
+                pass
+
     def stop(self):
         self._running = False
-        if self._thread:
-            self._thread.join(timeout=2)
-            self._thread = None
+        stream = self._stream
+        self._stream = None
+        thread = self._thread
+        self._thread = None
+        pa = self._pa
+        self._pa = None
 
-        # Force stream close in case capture thread got stuck.
-        if self._stream is not None:
-            try:
-                self._stream.stop_stream()
-            except Exception:
-                pass
-            try:
-                self._stream.close()
-            except Exception:
-                pass
-            self._stream = None
-
-        if self._pa:
-            try:
-                self._pa.terminate()
-            except Exception:
-                pass
-            self._pa = None
+        if stream is not None or thread is not None or pa is not None:
+            log.info("Stopping audio capture")
+            cleanup_thread = threading.Thread(
+                target=self._close_audio_resources,
+                args=(stream, pa, thread),
+                daemon=True,
+                name="AudioReactiveCleanup",
+            )
+            self._cleanup_thread = cleanup_thread
+            cleanup_thread.start()
 
         with self._lock:
             self._bands = [0.0] * NUM_BANDS
@@ -187,10 +215,12 @@ class AudioReactive:
                 except Exception:
                     time.sleep(0.01)
 
-            self._stream.stop_stream()
-            self._stream.close()
+            if self._stream is not None:
+                self._stream.close()
         except Exception:
             self._running = False
+        finally:
+            self._stream = None
 
     def _process_audio(self, data: "np.ndarray", sr: int):
         """Processa o bloco de áudio: FFT → bandas de frequência."""

@@ -80,6 +80,31 @@ _log.info("RESOURCE_BASE=%s", _RESOURCE_BASE)
 _log.info("sys.frozen=%s", getattr(sys, 'frozen', False))
 _log.info("app_version=%s", APP_VERSION)
 
+
+def _install_exception_hooks() -> None:
+    def _log_unhandled_exception(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            return
+        _log.critical(
+            "Unhandled exception",
+            exc_info=(exc_type, exc_value, exc_tb),
+        )
+
+    def _log_thread_exception(args):
+        if args.exc_type and issubclass(args.exc_type, KeyboardInterrupt):
+            return
+        _log.critical(
+            "Unhandled thread exception in %s",
+            getattr(args.thread, "name", "unknown"),
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+        )
+
+    sys.excepthook = _log_unhandled_exception
+    threading.excepthook = _log_thread_exception
+
+
+_install_exception_hooks()
+
 _UPDATE_REPO = "carloscosta2025086-web/WootFlow"
 _UPDATE_API = f"https://api.github.com/repos/{_UPDATE_REPO}/releases/latest"
 _UPDATE_STATE_FILE = os.path.join(os.environ.get("LOCALAPPDATA", _BASE), "WootFlow", "update_state.json")
@@ -641,6 +666,7 @@ def main():
         return
 
     # Open native window
+    _log.info("Creating native window")
     window = webview.create_window(
         title="WootFlow",
         url="http://127.0.0.1:9120",
@@ -760,7 +786,13 @@ def main():
 
     window.events.closing += on_closing
 
-    webview.start(debug=("--debug" in sys.argv))
+    try:
+        _log.info("Starting pywebview event loop")
+        webview.start(debug=("--debug" in sys.argv))
+        _log.info("pywebview event loop exited cleanly")
+    except Exception as exc:
+        _log.exception("pywebview startup/runtime failed: %s", exc)
+        raise
 
     # Cleanup extra após webview.start() retornar (janela já fechou)
     _cleanup_sdk()
