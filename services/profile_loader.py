@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 def load_profiles(profile_dir: str) -> Dict[str, Any]:
     """Load all JSON profiles from the given directory. Returns dict: profile_name -> profile_data."""

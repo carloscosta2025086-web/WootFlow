@@ -6,7 +6,7 @@ Comunica diretamente com a DLL do Wooting RGB SDK.
 import ctypes
 import os
 import sys
-from ctypes import c_bool, c_uint8, c_void_p, POINTER, Structure, c_char_p, c_uint16
+from ctypes import c_bool, c_uint8, POINTER, Structure, c_char_p
 
 
 # Constantes do teclado
