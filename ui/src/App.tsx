@@ -1,4 +1,4 @@
-import { useState, useMemo, type CSSProperties } from "react";
+import { useState, useMemo, useEffect, type CSSProperties } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { Sidebar } from "./components/Sidebar";
 import { EffectsPanel } from "./components/EffectsPanel";
@@ -9,9 +9,23 @@ import { KeyboardPreview } from "./components/KeyboardPreview";
 import type { Page } from "./types";
 import type { RGB } from "./types";
 
+function hexToRgbTuple(hex: string): string {
+  const clean = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return "0 255 200";
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `${r} ${g} ${b}`;
+}
+
 export default function App() {
   const { state, audio, frame, connected, diagnostics, send } = useWebSocket();
   const [page, setPage] = useState<Page>("effects");
+  const [themeHex, setThemeHex] = useState<string>(() => localStorage.getItem("wootflow.theme") || "#00ffc8");
+
+  useEffect(() => {
+    localStorage.setItem("wootflow.theme", themeHex);
+  }, [themeHex]);
 
   // Convert frame data to Map<string, RGB> for KeyboardPreview
   const keyColors = useMemo(() => {
@@ -33,10 +47,10 @@ export default function App() {
     };
 
     return (
-      <div className="h-screen bg-dark-900 flex items-center justify-center">
-        <div className="text-center max-w-lg px-6">
+      <div className="h-screen wf-shell flex items-center justify-center">
+        <div className="text-center max-w-lg px-6 wf-glass-panel">
           <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 text-sm">A ligar ao servidor...</p>
+          <p className="text-gray-200 text-sm font-medium">A ligar ao servidor...</p>
           <p className="text-gray-400 text-xs mt-3">{statusText[diagnostics.status] ?? diagnostics.status}</p>
           <p className="text-gray-500 text-xs mt-1">Tentativa: {diagnostics.attempt || 1}</p>
           <p className="text-gray-500 text-xs mt-1 break-all">Endpoint: {diagnostics.endpoint}</p>
@@ -56,7 +70,13 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-dark-900 text-white flex overflow-hidden">
+    <div
+      className="h-screen text-white flex overflow-hidden wf-shell"
+      style={{
+        "--theme-accent": themeHex,
+        "--theme-accent-rgb": hexToRgbTuple(themeHex),
+      } as CSSProperties}
+    >
       {/* Titlebar drag region */}
       <div
         className="fixed top-0 left-0 right-0 h-9 z-50"
@@ -73,19 +93,22 @@ export default function App() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 pt-9">
-        {/* Top bar with keyboard preview (always visible) */}
-        {page !== "perkey" && (
-          <div className="bg-dark-800/50 border-b border-dark-600 p-4 flex justify-center shrink-0">
+        {/* Top bar with keyboard preview (always visible, except perkey and settings) */}
+        {page !== "perkey" && page !== "settings" && (
+          <div className="px-5 pt-4 pb-2 shrink-0">
+            <div className="wf-glass-panel wf-top-preview flex justify-center">
             <KeyboardPreview
               selectedKey={null}
               onKeyClick={() => {}}
               keyColors={keyColors}
+              accentColor={themeHex}
             />
+            </div>
           </div>
         )}
 
         {/* Page content */}
-        <div className="flex-1 p-6 overflow-y-auto custom-scroll">
+        <div className={`flex-1 p-5 overflow-y-auto custom-scroll ${page === "settings" ? "wf-settings-page" : ""}`}>
           {page === "effects" && <EffectsPanel state={state} send={send} />}
           {page === "sound" && <SoundReactive state={state} audio={audio} send={send} />}
           {page === "perkey" && <PerKeyPanel state={state} send={send} />}
@@ -95,6 +118,8 @@ export default function App() {
               device={state.device}
               mode={state.mode}
               send={send}
+              themeHex={themeHex}
+              onThemeChange={setThemeHex}
             />
           )}
         </div>

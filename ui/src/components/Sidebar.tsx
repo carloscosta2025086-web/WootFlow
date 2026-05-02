@@ -16,37 +16,43 @@ interface Props {
 
 export function Sidebar({ page, onPageChange, connected, wsConnected }: Props) {
   return (
-    <aside className="w-16 bg-dark-800 border-r border-dark-600 flex flex-col items-center py-4 gap-1 select-none"
+    <aside className="w-[88px] border-r border-white/10 flex flex-col items-center py-4 gap-2 select-none wf-sidebar"
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
 
       {/* Logo */}
-      <div className="mb-4 text-accent-cyan font-bold text-lg tracking-wider">W</div>
+      <div className="mb-4 wf-logo-mark">WF</div>
 
       {/* Nav buttons */}
       {NAV_ITEMS.map((item) => (
         <button
           key={item.id}
           onClick={() => onPageChange(item.id)}
-          className={`w-11 h-11 rounded-lg flex flex-col items-center justify-center text-xs gap-0.5 transition-all duration-200
+          className={`w-[68px] h-[62px] rounded-2xl flex flex-col items-center justify-center text-xs gap-1 transition-all duration-200 border
             ${page === item.id
-              ? "bg-dark-500 text-accent-cyan shadow-lg shadow-accent-cyan/10"
-              : "text-gray-500 hover:text-gray-300 hover:bg-dark-700"
+              ? "bg-white/10 text-white border-white/20 shadow-lg shadow-black/30"
+              : "text-gray-500 border-transparent hover:text-gray-200 hover:bg-white/5 hover:border-white/10"
             }`}
           title={item.label}
         >
-          <span className="text-base">{item.icon}</span>
-          <span className="text-[9px] leading-none">{item.label}</span>
+          <span className="text-lg leading-none">{item.icon}</span>
+          <span className="text-[10px] leading-none font-medium tracking-wide">{item.label}</span>
         </button>
       ))}
 
       <div className="flex-1" />
 
       {/* Status */}
-      <div className="flex flex-col items-center gap-2 mb-2">
-        <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`}
-          title={connected ? "Teclado conectado" : "Teclado desconectado"} />
-        <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-accent-cyan" : "bg-gray-600"}`}
-          title={wsConnected ? "Servidor online" : "Servidor offline"} />
+      <div className="flex flex-col items-center gap-2 mb-2 wf-status-pills">
+        <div className="flex flex-col items-center gap-1">
+          <div className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+            title={connected ? "Teclado conectado" : "Teclado desconectado"} />
+          <span className="text-[8px] text-gray-500 leading-none">KB</span>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <div className={`w-2.5 h-2.5 rounded-full ${wsConnected ? "bg-accent-cyan animate-pulse" : "bg-gray-600"}`}
+            title={wsConnected ? "Servidor online" : "Servidor offline"} />
+          <span className="text-[8px] text-gray-500 leading-none">WS</span>
+        </div>
       </div>
     </aside>
   );

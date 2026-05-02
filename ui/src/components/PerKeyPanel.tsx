@@ -8,27 +8,48 @@ interface Props {
   send: (data: Record<string, unknown>) => void;
 }
 
+// Spacebar LEDs: row 5, cols 4-8 (center col 6 is the "Spacebar" label)
+const SPACEBAR_LEDS = [
+  { row: 5, col: 4 },
+  { row: 5, col: 5 },
+  { row: 5, col: 6 },
+  { row: 5, col: 7 },
+  { row: 5, col: 8 },
+];
+
+function isSpacebarLed(row: number, col: number): boolean {
+  return SPACEBAR_LEDS.some((k) => k.row === row && k.col === col);
+}
+
 export function PerKeyPanel({ state, send }: Props) {
   const [selectedKey, setSelectedKey] = useState<{ row: number; col: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<RGB>({ r: 0, g: 255, b: 200 });
   const [keyColors, setKeyColors] = useState<Map<string, RGB>>(new Map());
+  const [spacebarMode, setSpacebarMode] = useState<"group" | "individual">("group");
 
   const activateMode = () => {
     send({ action: "set_mode", mode: "perkey" });
   };
 
+  function applyColorToKey(map: Map<string, RGB>, row: number, col: number, color: RGB) {
+    map.set(`${row}-${col}`, { ...color });
+    send({ action: "set_perkey", row, col, color: [color.r, color.g, color.b] });
+  }
+
   const handleKeyClick = (row: number, col: number) => {
     setSelectedKey({ row, col });
-    // Apply current color to clicked key
     const newColors = new Map(keyColors);
-    newColors.set(`${row}-${col}`, { ...currentColor });
+
+    if (spacebarMode === "group" && isSpacebarLed(row, col)) {
+      // Apply color to all spacebar LEDs at once
+      for (const led of SPACEBAR_LEDS) {
+        applyColorToKey(newColors, led.row, led.col, currentColor);
+      }
+    } else {
+      applyColorToKey(newColors, row, col, currentColor);
+    }
+
     setKeyColors(newColors);
-    send({
-      action: "set_perkey",
-      row,
-      col,
-      color: [currentColor.r, currentColor.g, currentColor.b],
-    });
   };
 
   const applyAll = () => {
@@ -44,27 +65,38 @@ export function PerKeyPanel({ state, send }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-5 h-full overflow-y-auto pr-2 custom-scroll">
+    <div className="flex flex-col gap-5 h-full overflow-y-auto pr-2 custom-scroll wf-page-entrance">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between wf-panel">
         <div>
           <h2 className="text-lg font-semibold text-white">Edição Per-Key</h2>
-          <p className="text-xs text-gray-500">Clica numa tecla para aplicar a cor selecionada</p>
+          <p className="text-xs text-gray-400">Clica numa tecla para aplicar a cor selecionada</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setSpacebarMode((m) => (m === "group" ? "individual" : "group"))}
+            className={`px-3 py-2 rounded-lg text-xs transition-all border ${
+              spacebarMode === "group"
+                ? "bg-white/10 text-white border-white/20"
+                : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+            }`}
+            title="Spacebar: grupo ou LEDs individuais"
+          >
+            {spacebarMode === "group" ? "⎵ Grupo" : "⎵ Individual"}
+          </button>
           <button
             onClick={activateMode}
             className={`px-4 py-2 rounded-lg text-sm transition-all
               ${state.mode === "perkey"
-                ? "bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30"
-                : "bg-dark-700 text-gray-400 border border-dark-500 hover:bg-dark-600"
+                ? "bg-white/10 text-white border border-white/20"
+                : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
               }`}
           >
             {state.mode === "perkey" ? "✓ Ativo" : "Ativar"}
           </button>
           <button
             onClick={applyAll}
-            className="px-4 py-2 rounded-lg text-sm bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+            className="px-4 py-2 rounded-lg text-sm bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
           >
             Aplicar a Todas
           </button>
@@ -73,7 +105,7 @@ export function PerKeyPanel({ state, send }: Props) {
               setKeyColors(new Map());
               send({ action: "reset_perkey" });
             }}
-            className="px-4 py-2 rounded-lg text-sm bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+            className="px-4 py-2 rounded-lg text-sm bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
           >
             ↺ Reset
           </button>
@@ -81,7 +113,7 @@ export function PerKeyPanel({ state, send }: Props) {
       </div>
 
       {/* Keyboard */}
-      <div className="bg-dark-800 rounded-xl border border-dark-600 p-4 flex justify-center">
+      <div className="wf-panel p-4 flex justify-center">
         <KeyboardPreview
           selectedKey={selectedKey}
           onKeyClick={handleKeyClick}
@@ -97,8 +129,9 @@ export function PerKeyPanel({ state, send }: Props) {
       />
 
       {selectedKey && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-400">
           Tecla selecionada: Row {selectedKey.row}, Col {selectedKey.col}
+          {isSpacebarLed(selectedKey.row, selectedKey.col) && spacebarMode === "group" && " · Spacebar (grupo)"}
         </p>
       )}
     </div>

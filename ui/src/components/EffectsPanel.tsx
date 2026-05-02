@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { AppState, RGB } from "../types";
 import { ColorPicker } from "./ColorPicker";
 
@@ -24,57 +25,61 @@ export function EffectsPanel({ state, send }: Props) {
   const effectMap = new Map(state.effects);
   const magneticInfluence = state.effectParams?.magneticInfluence ?? 3.0;
   const liquidDeform = state.effectParams?.liquidDeform ?? 0.55;
+  const brightnessPct = Math.round(state.brightness * 100);
+  const speedPct = Math.round((state.speed / 5) * 100);
+  const magneticPct = Math.round(((magneticInfluence - 1.2) / (6 - 1.2)) * 100);
+  const deformPct = Math.round((liquidDeform / 1.5) * 100);
 
   return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2 custom-scroll">
+    <div className="flex flex-col gap-5 h-full overflow-y-auto pr-2 custom-scroll wf-page-entrance">
       {/* Effect grid by category */}
       {Object.entries(CATEGORIES).map(([cat, ids]) => (
-        <div key={cat}>
-          <h3 className="text-xs text-gray-500 uppercase tracking-wider mb-2">{cat}</h3>
-          <div className="grid grid-cols-3 gap-2">
+        <section key={cat} className="wf-panel">
+          <h3 className="wf-section-title">{cat}</h3>
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
             {ids.filter(id => effectMap.has(id)).map((id) => (
               <button
                 key={id}
                 onClick={() => setEffect(id)}
-                className={`px-3 py-2.5 rounded-lg text-sm transition-all duration-200 text-left
+                className={`px-3 py-2.5 rounded-xl text-sm transition-all duration-200 text-left border
                   ${state.effect === id
-                    ? "bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 shadow-lg shadow-accent-cyan/5"
-                    : "bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600 hover:text-white"
+                    ? "bg-white/10 text-white border-white/20 shadow-lg shadow-black/30"
+                    : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10 hover:text-white"
                   }`}
               >
                 {effectMap.get(id)}
               </button>
             ))}
           </div>
-        </div>
+        </section>
       ))}
 
-      {/* Divider */}
-      <div className="border-t border-dark-600" />
-
       {/* Controls */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 wf-panel">
+        <h3 className="wf-section-title">Controlos</h3>
+
         {/* Brightness */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-400 flex justify-between">
+          <span className="text-xs text-gray-300 flex justify-between">
             Brilho
-            <span className="text-accent-cyan">{Math.round(state.brightness * 100)}%</span>
+            <span className="text-white">{brightnessPct}%</span>
           </span>
           <input
             type="range"
             min={0}
             max={100}
-            value={Math.round(state.brightness * 100)}
+            value={brightnessPct}
             onChange={(e) => send({ action: "set_brightness", value: +e.target.value / 100 })}
-            className="accent-cyan-400"
+            className="wf-slider"
+            style={{ "--p": `${brightnessPct}%` } as CSSProperties}
           />
         </label>
 
         {/* Speed */}
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-400 flex justify-between">
+          <span className="text-xs text-gray-300 flex justify-between">
             Velocidade
-            <span className="text-accent-cyan">{state.speed.toFixed(1)}x</span>
+            <span className="text-white">{state.speed.toFixed(1)}x</span>
           </span>
           <input
             type="range"
@@ -82,15 +87,16 @@ export function EffectsPanel({ state, send }: Props) {
             max={500}
             value={Math.round(state.speed * 100)}
             onChange={(e) => send({ action: "set_speed", value: +e.target.value / 100 })}
-            className="accent-cyan-400"
+            className="wf-slider"
+            style={{ "--p": `${speedPct}%` } as CSSProperties}
           />
         </label>
 
         {state.effect === "magnetic_keys" && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-gray-400 flex justify-between">
+            <span className="text-xs text-gray-300 flex justify-between">
               Campo de Influência
-              <span className="text-accent-cyan">{magneticInfluence.toFixed(1)}</span>
+              <span className="text-white">{magneticInfluence.toFixed(1)}</span>
             </span>
             <input
               type="range"
@@ -104,16 +110,17 @@ export function EffectsPanel({ state, send }: Props) {
                   value: +e.target.value / 10,
                 })
               }
-              className="accent-cyan-400"
+              className="wf-slider"
+              style={{ "--p": `${magneticPct}%` } as CSSProperties}
             />
           </label>
         )}
 
         {state.effect === "liquid_flow" && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-gray-400 flex justify-between">
+            <span className="text-xs text-gray-300 flex justify-between">
               Deformação por Input
-              <span className="text-accent-cyan">{liquidDeform.toFixed(2)}</span>
+              <span className="text-white">{liquidDeform.toFixed(2)}</span>
             </span>
             <input
               type="range"
@@ -127,13 +134,24 @@ export function EffectsPanel({ state, send }: Props) {
                   value: +e.target.value / 100,
                 })
               }
-              className="accent-cyan-400"
+              className="wf-slider"
+              style={{ "--p": `${deformPct}%` } as CSSProperties}
             />
           </label>
         )}
 
         {/* Colors */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center justify-center py-1">
+          <button
+            onClick={() => send({ action: "set_color2", color: state.color1 })}
+            className="wf-primary-btn"
+            title="Sincroniza cor secundária com a cor primária"
+          >
+            Sync Cores
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <ColorPicker
             label="Cor Primária"
             color={{ r: state.color1[0], g: state.color1[1], b: state.color1[2] }}
