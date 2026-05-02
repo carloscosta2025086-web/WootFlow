@@ -48,7 +48,7 @@ export function Settings({ connected, device, mode, send, themeHex, onThemeChang
             className={`px-4 py-2 rounded-lg text-sm transition-all ${
               mode === "off"
                 ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                : "bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+                : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
             }`}
           >
             ⏻ Desligar LEDs
@@ -56,7 +56,7 @@ export function Settings({ connected, device, mode, send, themeHex, onThemeChang
           {mode === "off" && (
             <button
               onClick={() => send({ action: "set_mode", mode: "effect" })}
-              className="px-4 py-2 rounded-lg text-sm bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25 transition-all"
+              className="px-4 py-2 rounded-lg text-sm bg-white/10 text-white border border-white/20 hover:bg-white/15 transition-all"
             >
               ✦ Ligar LEDs
             </button>
@@ -74,18 +74,18 @@ export function Settings({ connected, device, mode, send, themeHex, onThemeChang
               type="color"
               value={themeHex}
               onChange={(e) => onThemeChange(e.target.value)}
-              className="w-12 h-9 bg-transparent border border-dark-500 rounded-md p-1 cursor-pointer"
+              className="w-12 h-9 bg-transparent border border-white/20 rounded-md p-1 cursor-pointer"
             />
           </label>
           <input
             value={themeHex}
             onChange={(e) => onThemeChange(e.target.value)}
-            className="w-28 bg-dark-700 border border-dark-500 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none"
+            className="wf-field w-28"
             maxLength={7}
           />
           <button
             onClick={() => onThemeChange("#00ffc8")}
-            className="px-3 py-1.5 rounded-md text-xs bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+            className="px-3 py-1.5 rounded-md text-xs bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
           >
             Reset tema
           </button>

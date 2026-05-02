@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from "react";
+import type { CSSProperties } from "react";
 import type { AppState, AudioData } from "../types";
 
 interface Props {
@@ -15,6 +16,10 @@ const BAR_COLORS = [
 
 export function SoundReactive({ state, audio, send }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sensitivity = state._sensitivity ?? 1.5;
+  const smoothing = state._smoothing ?? 0.3;
+  const sensPct = Math.round(((sensitivity - 0.1) / (5 - 0.1)) * 100);
+  const smoothPct = Math.round(smoothing * 100);
 
   const drawBars = useCallback(() => {
     const canvas = canvasRef.current;
@@ -96,19 +101,19 @@ export function SoundReactive({ state, audio, send }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-4 h-full wf-page-entrance">
       {/* Header & toggle */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between wf-panel">
         <div>
           <h2 className="text-lg font-semibold text-white">Som Reativo</h2>
-          <p className="text-xs text-gray-500">Equalizer baseado no áudio do sistema (WASAPI Loopback)</p>
+          <p className="text-xs text-gray-400">Equalizer em tempo real com captura WASAPI Loopback</p>
         </div>
         <button
           onClick={toggle}
-          className={`px-5 py-2 rounded-lg font-medium text-sm transition-all duration-300
+          className={`px-5 py-2 rounded-xl font-medium text-sm transition-all duration-300 border
             ${state.audioRunning
-              ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-              : "bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25"
+              ? "bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30"
+              : "bg-white/10 text-white border-white/20 hover:bg-white/15"
             }`}
         >
           {state.audioRunning ? "⏹ Parar" : "▶ Iniciar"}
@@ -116,13 +121,13 @@ export function SoundReactive({ state, audio, send }: Props) {
       </div>
 
       {!state.audioAvailable && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3 text-sm text-yellow-400">
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 text-sm text-yellow-300">
           PyAudioWPATCH não disponível. Instala com: pip install pyaudiowpatch
         </div>
       )}
 
       {/* Equalizer visualization */}
-      <div className="flex-1 bg-dark-800 rounded-xl border border-dark-600 p-4 min-h-[200px]">
+      <div className="flex-1 wf-panel p-4 min-h-[220px]">
         <canvas
           ref={canvasRef}
           className="w-full h-full"
@@ -131,33 +136,35 @@ export function SoundReactive({ state, audio, send }: Props) {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 wf-panel">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-400 flex justify-between">
+          <span className="text-xs text-gray-300 flex justify-between">
             Sensibilidade
-            <span className="text-accent-cyan">{((state as any)._sensitivity ?? 1.5).toFixed(1)}</span>
+            <span className="text-white">{sensitivity.toFixed(1)}</span>
           </span>
           <input
             type="range"
             min={10}
             max={500}
-            defaultValue={150}
+            value={Math.round(sensitivity * 100)}
             onChange={(e) => send({ action: "set_audio_sensitivity", value: +e.target.value / 100 })}
-            className="accent-cyan-400"
+            className="wf-slider"
+            style={{ "--p": `${sensPct}%` } as CSSProperties}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-400 flex justify-between">
+          <span className="text-xs text-gray-300 flex justify-between">
             Suavização
-            <span className="text-accent-cyan">{((state as any)._smoothing ?? 0.3).toFixed(2)}</span>
+            <span className="text-white">{smoothing.toFixed(2)}</span>
           </span>
           <input
             type="range"
             min={0}
             max={95}
-            defaultValue={30}
+            value={Math.round(smoothing * 100)}
             onChange={(e) => send({ action: "set_audio_smoothing", value: +e.target.value / 100 })}
-            className="accent-cyan-400"
+            className="wf-slider"
+            style={{ "--p": `${smoothPct}%` } as CSSProperties}
           />
         </label>
       </div>

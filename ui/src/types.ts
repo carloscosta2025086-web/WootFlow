@@ -13,6 +13,8 @@ export interface AppState {
   };
   audioRunning: boolean;
   audioAvailable: boolean;
+  _sensitivity?: number;
+  _smoothing?: number;
   pynputAvailable: boolean;
   device?: {
     model: string;

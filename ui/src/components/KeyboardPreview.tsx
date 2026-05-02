@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import type { KeyDef, RGB } from "../types";
 
 // ── ISO PT 60HE layout ──
@@ -103,6 +103,7 @@ export function KeyboardPreview({
   accentColor = "#00ffc8",
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [tick, setTick] = useState(0);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -128,6 +129,16 @@ export function KeyboardPreview({
 
     // Background
     ctx.clearRect(0, 0, totalW, totalH);
+    const pulse = 0.86 + Math.sin(tick / 10) * 0.08;
+
+    // Keyboard chassis
+    ctx.fillStyle = "#0f152b";
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(PAD - 8, PAD - 8, totalW - (PAD - 8) * 2, totalH - (PAD - 8) * 2, 16);
+    ctx.fill();
+    ctx.stroke();
 
     for (const key of LAYOUT) {
       const visualRow = (key.visualRow ?? key.row) - 1; // SDK rows 1-5 → visual rows 0-4
@@ -143,21 +154,32 @@ export function KeyboardPreview({
 
       // Background
       if (ck) {
-        ctx.fillStyle = `rgb(${ck.r}, ${ck.g}, ${ck.b})`;
+        const rr = Math.round(ck.r * pulse);
+        const gg = Math.round(ck.g * pulse);
+        const bb = Math.round(ck.b * pulse);
+        ctx.fillStyle = `rgb(${rr}, ${gg}, ${bb})`;
       } else {
-        ctx.fillStyle = "#1e1e2e";
+        ctx.fillStyle = "#18203a";
+      }
+
+      if (ck) {
+        ctx.shadowColor = `rgba(${ck.r}, ${ck.g}, ${ck.b}, 0.35)`;
+        ctx.shadowBlur = 11;
+      } else {
+        ctx.shadowBlur = 0;
       }
 
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, RADIUS);
       ctx.fill();
+      ctx.shadowBlur = 0;
 
       // Border
       if (isSelected) {
         ctx.strokeStyle = accentColor;
         ctx.lineWidth = 2;
       } else {
-        ctx.strokeStyle = "#333346";
+        ctx.strokeStyle = "#2f3a5f";
         ctx.lineWidth = 1;
       }
       ctx.stroke();
@@ -172,13 +194,18 @@ export function KeyboardPreview({
       ctx.textBaseline = "middle";
       ctx.fillText(key.label, x + w / 2, y + h / 2);
     }
-  }, [selectedKey, keyColors, accentColor]);
+  }, [selectedKey, keyColors, accentColor, tick]);
 
   useEffect(() => {
     draw();
     window.addEventListener("resize", draw);
     return () => window.removeEventListener("resize", draw);
   }, [draw]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setTick((v) => v + 1), 66);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -204,7 +231,7 @@ export function KeyboardPreview({
     <canvas
       ref={canvasRef}
       onClick={handleClick}
-      className="cursor-pointer rounded-xl"
+      className="cursor-pointer rounded-2xl"
       style={{ maxWidth: "100%" }}
     />
   );

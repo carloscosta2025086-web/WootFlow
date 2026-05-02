@@ -65,20 +65,20 @@ export function PerKeyPanel({ state, send }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-5 h-full overflow-y-auto pr-2 custom-scroll">
+    <div className="flex flex-col gap-5 h-full overflow-y-auto pr-2 custom-scroll wf-page-entrance">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between wf-panel">
         <div>
           <h2 className="text-lg font-semibold text-white">Edição Per-Key</h2>
-          <p className="text-xs text-gray-500">Clica numa tecla para aplicar a cor selecionada</p>
+          <p className="text-xs text-gray-400">Clica numa tecla para aplicar a cor selecionada</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setSpacebarMode((m) => (m === "group" ? "individual" : "group"))}
             className={`px-3 py-2 rounded-lg text-xs transition-all border ${
               spacebarMode === "group"
-                ? "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30"
-                : "bg-dark-700 text-gray-400 border-dark-500 hover:bg-dark-600"
+                ? "bg-white/10 text-white border-white/20"
+                : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
             }`}
             title="Spacebar: grupo ou LEDs individuais"
           >
@@ -88,15 +88,15 @@ export function PerKeyPanel({ state, send }: Props) {
             onClick={activateMode}
             className={`px-4 py-2 rounded-lg text-sm transition-all
               ${state.mode === "perkey"
-                ? "bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30"
-                : "bg-dark-700 text-gray-400 border border-dark-500 hover:bg-dark-600"
+                ? "bg-white/10 text-white border border-white/20"
+                : "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
               }`}
           >
             {state.mode === "perkey" ? "✓ Ativo" : "Ativar"}
           </button>
           <button
             onClick={applyAll}
-            className="px-4 py-2 rounded-lg text-sm bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+            className="px-4 py-2 rounded-lg text-sm bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
           >
             Aplicar a Todas
           </button>
@@ -105,7 +105,7 @@ export function PerKeyPanel({ state, send }: Props) {
               setKeyColors(new Map());
               send({ action: "reset_perkey" });
             }}
-            className="px-4 py-2 rounded-lg text-sm bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+            className="px-4 py-2 rounded-lg text-sm bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
           >
             ↺ Reset
           </button>
@@ -113,7 +113,7 @@ export function PerKeyPanel({ state, send }: Props) {
       </div>
 
       {/* Keyboard */}
-      <div className="bg-dark-800 rounded-xl border border-dark-600 p-4 flex justify-center">
+      <div className="wf-panel p-4 flex justify-center">
         <KeyboardPreview
           selectedKey={selectedKey}
           onKeyClick={handleKeyClick}
@@ -129,7 +129,7 @@ export function PerKeyPanel({ state, send }: Props) {
       />
 
       {selectedKey && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-400">
           Tecla selecionada: Row {selectedKey.row}, Col {selectedKey.col}
           {isSpacebarLed(selectedKey.row, selectedKey.col) && spacebarMode === "group" && " · Spacebar (grupo)"}
         </p>
