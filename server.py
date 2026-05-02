@@ -490,7 +490,8 @@ class AppState:
                 self.current_effect_name = name
                 self.current_effect = EFFECT_REGISTRY[name]()
                 self.current_effect.brightness = self.brightness
-                self.current_effect.speed = self.speed
+                self.current_effect._base_speed = self.current_effect.speed
+                self.current_effect.speed = self.current_effect._base_speed * self.speed
                 self.current_effect.color1 = self.color1
                 self.current_effect.color2 = self.color2
                 if hasattr(self.current_effect, "influence"):
@@ -1082,7 +1083,8 @@ async def handle_message(ws: WebSocket, msg: dict):
         val = max(0.1, min(5.0, float(msg.get("value", 1.0))))
         state.speed = val
         if state.current_effect:
-            state.current_effect.speed = val
+            base = getattr(state.current_effect, "_base_speed", None)
+            state.current_effect.speed = (base if base is not None else 1.0) * val
         state.save_settings()
         await broadcast(state.get_state_dict())
 

@@ -131,7 +131,6 @@ export function ColorPicker({ color, onChange, label = "Cor" }: Props) {
   const svCanvasRef = useRef<HTMLCanvasElement>(null);
   const [hsv, setHsv] = useState<HSV>(() => rgbToHsv(color.r, color.g, color.b));
   const [draggingSV, setDraggingSV] = useState(false);
-  const [mode, setMode] = useState<"solid" | "gradient">("solid");
   const [hexInput, setHexInput] = useState<string>(rgbToHex(color));
 
   const historyKey = useMemo(() => `wootflow.colors.history.${label}`.toLowerCase(), [label]);
@@ -310,8 +309,6 @@ export function ColorPicker({ color, onChange, label = "Cor" }: Props) {
       <header className="wf-color-header">
         <span className="wf-color-label">{label}</span>
         <div className="wf-chip-row">
-          <button className={`wf-mini-btn ${mode === "solid" ? "is-active" : ""}`} onClick={() => setMode("solid")}>Solid</button>
-          <button className={`wf-mini-btn ${mode === "gradient" ? "is-active" : ""}`} onClick={() => setMode("gradient")}>Gradient</button>
           <button className="wf-icon-btn" onClick={toggleFavorite} title="Favorito">{favorites.includes(currentHex) ? "★" : "☆"}</button>
           <button className="wf-icon-btn" onClick={pickScreenColor} title="Eyedropper">⌁</button>
         </div>
@@ -331,9 +328,7 @@ export function ColorPicker({ color, onChange, label = "Cor" }: Props) {
           <div
             className="wf-color-preview"
             style={{
-              background: mode === "gradient"
-                ? `linear-gradient(135deg, rgba(${color.r}, ${color.g}, ${color.b}, 0.18) 0%, rgb(${color.r}, ${color.g}, ${color.b}) 50%, rgba(255,255,255,0.18) 100%)`
-                : `rgb(${color.r}, ${color.g}, ${color.b})`,
+              background: `rgb(${color.r}, ${color.g}, ${color.b})`,
               boxShadow: `0 0 26px rgba(${color.r}, ${color.g}, ${color.b}, 0.42)`,
             }}
           />
