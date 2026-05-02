@@ -75,7 +75,7 @@ const LAYOUT: KeyDef[] = [
   // Spacebar — 5 individual LEDs mapped to the center of SDK space range (cols 4-8)
   { row: 5, col: 4, x: 3.75, w: 1.25, label: "" },
   { row: 5, col: 5, x: 5, w: 1.25, label: "" },
-  { row: 5, col: 6, x: 6.25, w: 1.25, label: "" },
+  { row: 5, col: 6, x: 6.25, w: 1.25, label: "Spacebar" },
   { row: 5, col: 7, x: 7.5, w: 1.25, label: "" },
   { row: 5, col: 8, x: 8.75, w: 1.25, label: "" },
   { row: 5, col: 10, x: 10, w: 1.25, label: "AltGr" },

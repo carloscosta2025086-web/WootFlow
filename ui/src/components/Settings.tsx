@@ -3,22 +3,24 @@ interface Props {
   device?: { model: string; layout: string };
   mode: string;
   send: (data: Record<string, unknown>) => void;
+  themeHex: string;
+  onThemeChange: (value: string) => void;
 }
 
-export function Settings({ connected, device, mode, send }: Props) {
+export function Settings({ connected, device, mode, send, themeHex, onThemeChange }: Props) {
   return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2 custom-scroll">
-      <div>
-        <h2 className="text-lg font-semibold text-white">Definições</h2>
-        <p className="text-xs text-gray-500">Configuração da aplicação</p>
+    <div className="wf-settings-grid">
+      <div className="wf-settings-head">
+        <h2 className="text-2xl font-semibold text-white">Definições</h2>
+        <p className="text-sm text-gray-400">Configuração da aplicação e personalização da interface.</p>
       </div>
 
       {/* Device info */}
-      <div className="bg-dark-800 rounded-xl border border-dark-600 p-5">
+      <div className="wf-card wf-card-hero">
         <h3 className="text-sm font-medium text-gray-300 mb-3">Dispositivo</h3>
         <div className="flex items-center gap-3 mb-3">
           <div className={`w-3 h-3 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
-          <span className="text-sm text-gray-400">
+          <span className="text-base text-gray-200">
             {connected && device
               ? `${device.model} (${device.layout})`
               : connected
@@ -26,18 +28,21 @@ export function Settings({ connected, device, mode, send }: Props) {
               : "Nenhum teclado detectado"}
           </span>
         </div>
+        <p className="text-xs text-gray-500 mb-4">
+          Estado atualizado em tempo real. Se desligares o cabo USB, este painel reflete de imediato.
+        </p>
         <button
           onClick={() => send({ action: "reconnect" })}
-          className="px-4 py-2 rounded-lg text-sm bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600 transition-all"
+          className="wf-primary-btn"
         >
           ↻ Reconectar
         </button>
       </div>
 
-      {/* LEDs off */}
-      <div className="bg-dark-800 rounded-xl border border-dark-600 p-5">
+      {/* LEDs */}
+      <div className="wf-card">
         <h3 className="text-sm font-medium text-gray-300 mb-3">LEDs</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => send({ action: "set_mode", mode: "off" })}
             className={`px-4 py-2 rounded-lg text-sm transition-all ${
@@ -59,8 +64,36 @@ export function Settings({ connected, device, mode, send }: Props) {
         </div>
       </div>
 
+      {/* Theme */}
+      <div className="wf-card">
+        <h3 className="text-sm font-medium text-gray-300 mb-3">Tema da Interface</h3>
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-3">
+            <span className="text-xs text-gray-400 uppercase tracking-wider">Cor Base</span>
+            <input
+              type="color"
+              value={themeHex}
+              onChange={(e) => onThemeChange(e.target.value)}
+              className="w-12 h-9 bg-transparent border border-dark-500 rounded-md p-1 cursor-pointer"
+            />
+          </label>
+          <input
+            value={themeHex}
+            onChange={(e) => onThemeChange(e.target.value)}
+            className="w-28 bg-dark-700 border border-dark-500 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none"
+            maxLength={7}
+          />
+          <button
+            onClick={() => onThemeChange("#00ffc8")}
+            className="px-3 py-1.5 rounded-md text-xs bg-dark-700 text-gray-300 border border-dark-500 hover:bg-dark-600"
+          >
+            Reset tema
+          </button>
+        </div>
+      </div>
+
       {/* About */}
-      <div className="bg-dark-800 rounded-xl border border-dark-600 p-5">
+      <div className="wf-card">
         <h3 className="text-sm font-medium text-gray-300 mb-3">Sobre</h3>
         <div className="space-y-1 text-sm text-gray-500">
           <p>WootFlow Control v3.2.1</p>
@@ -71,7 +104,7 @@ export function Settings({ connected, device, mode, send }: Props) {
       </div>
 
       {/* Tech stack */}
-      <div className="bg-dark-800 rounded-xl border border-dark-600 p-5">
+      <div className="wf-card">
         <h3 className="text-sm font-medium text-gray-300 mb-3">Stack</h3>
         <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
           <span>● WootFlow SDK Bridge</span>

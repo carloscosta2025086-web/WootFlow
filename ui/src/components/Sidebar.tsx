@@ -43,10 +43,16 @@ export function Sidebar({ page, onPageChange, connected, wsConnected }: Props) {
 
       {/* Status */}
       <div className="flex flex-col items-center gap-2 mb-2">
-        <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`}
-          title={connected ? "Teclado conectado" : "Teclado desconectado"} />
-        <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-accent-cyan" : "bg-gray-600"}`}
-          title={wsConnected ? "Servidor online" : "Servidor offline"} />
+        <div className="flex flex-col items-center gap-1">
+          <div className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+            title={connected ? "Teclado conectado" : "Teclado desconectado"} />
+          <span className="text-[8px] text-gray-600 leading-none">KB</span>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <div className={`w-2.5 h-2.5 rounded-full ${wsConnected ? "bg-accent-cyan animate-pulse" : "bg-gray-600"}`}
+            title={wsConnected ? "Servidor online" : "Servidor offline"} />
+          <span className="text-[8px] text-gray-600 leading-none">WS</span>
+        </div>
       </div>
     </aside>
   );
