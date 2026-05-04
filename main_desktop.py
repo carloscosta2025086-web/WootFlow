@@ -615,8 +615,63 @@ def _check_for_updates_and_maybe_apply() -> bool:
     return False
 
 
+def _ui_needs_rebuild() -> bool:
+    """Verifica se os ficheiros fonte da UI são mais recentes que o build."""
+    ui_dir = os.path.join(_BASE, "ui")
+    dist_index = os.path.join(ui_dir, "dist", "index.html")
+    if not os.path.exists(dist_index):
+        return True
+    dist_mtime = os.path.getmtime(dist_index)
+    src_dir = os.path.join(ui_dir, "src")
+    if not os.path.isdir(src_dir):
+        return False
+    for root, _dirs, files in os.walk(src_dir):
+        for f in files:
+            if os.path.getmtime(os.path.join(root, f)) > dist_mtime:
+                return True
+    # Also check index.css and any top-level src files
+    for name in ("index.css", "package.json", "vite.config.ts", "tsconfig.json"):
+        p = os.path.join(ui_dir, name)
+        if os.path.exists(p) and os.path.getmtime(p) > dist_mtime:
+            return True
+    return False
+
+
+def _rebuild_ui() -> bool:
+    """Executa 'npm run build' na pasta ui/ e aguarda conclusão."""
+    ui_dir = os.path.join(_BASE, "ui")
+    npm_cmd = shutil.which("npm") or "npm"
+    _log.info("UI source newer than dist — rebuilding UI...")
+    try:
+        result = subprocess.run(
+            ["cmd", "/c", npm_cmd, "run", "build"],
+            cwd=ui_dir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            _log.info("UI rebuild successful")
+            return True
+        else:
+            _log.error("UI rebuild failed (exit %s): %s", result.returncode, result.stderr[-2000:])
+            return False
+    except Exception as exc:
+        _log.exception("UI rebuild exception: %s", exc)
+        return False
+
+
+def _ensure_ui_is_built():
+    """Em modo dev (não frozen), reconstrói a UI se os sources forem mais recentes."""
+    if getattr(sys, "frozen", False):
+        return  # No .exe, a UI é embutida pelo PyInstaller
+    if _ui_needs_rebuild():
+        _rebuild_ui()
+
+
 def main():
     _ensure_windows_prerequisites()
+    _ensure_ui_is_built()
 
     if _check_for_updates_and_maybe_apply():
         return

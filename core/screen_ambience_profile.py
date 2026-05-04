@@ -90,9 +90,76 @@ class ScreenAmbienceProfile:
         
         # Mapeamento regiões -> teclas
         self.region_keys = self._build_region_map()
+        self.led_brightness = self._build_led_brightness_map()
+        self.individual_brightness = self._build_individual_brightness_config()
         self.led_sample_regions = self._build_led_sample_regions()
         
         print("[Screen Ambience] Perfil inicializado")
+
+    def _build_individual_brightness_config(self) -> Dict[str, float | bool]:
+        """Configura resposta de brilho individual por LED baseada na luminância local."""
+        cfg = self.profile_data.get("individual_brightness", {}) or {}
+
+        enabled = bool(cfg.get("enabled", True))
+        try:
+            min_scale = float(cfg.get("min_scale", 0.35))
+        except Exception:
+            min_scale = 0.35
+        try:
+            max_scale = float(cfg.get("max_scale", 1.8))
+        except Exception:
+            max_scale = 1.8
+        try:
+            gamma = float(cfg.get("gamma", 0.75))
+        except Exception:
+            gamma = 0.75
+
+        min_scale = max(0.05, min(2.0, min_scale))
+        max_scale = max(min_scale, min(3.0, max_scale))
+        gamma = max(0.25, min(2.5, gamma))
+
+        return {
+            "enabled": enabled,
+            "min_scale": min_scale,
+            "max_scale": max_scale,
+            "gamma": gamma,
+        }
+
+    def _apply_individual_brightness(self, color: Tuple[int, int, int]) -> Tuple[int, int, int]:
+        """Aplica curva de brilho local por LED para reforçar hotspots do ecrã."""
+        cfg = self.individual_brightness
+        if not cfg.get("enabled", True):
+            return color
+
+        r, g, b = color
+        luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+
+        min_scale = float(cfg["min_scale"])
+        max_scale = float(cfg["max_scale"])
+        gamma = float(cfg["gamma"])
+
+        scale = min_scale + (luminance ** gamma) * (max_scale - min_scale)
+        r = max(0, min(255, int(r * scale)))
+        g = max(0, min(255, int(g * scale)))
+        b = max(0, min(255, int(b * scale)))
+        return (r, g, b)
+
+    def _build_led_brightness_map(self) -> Dict[Tuple[int, int], float]:
+        """Constrói multiplicador de brilho por LED com base na região da grid."""
+        per_region = self.profile_data.get("region_brightness", {}) or {}
+        brightness_map: Dict[Tuple[int, int], float] = {}
+
+        for region, keys in self.region_keys.items():
+            factor_raw = per_region.get(str(region), per_region.get(region, 1.0))
+            try:
+                factor = float(factor_raw)
+            except Exception:
+                factor = 1.0
+            factor = max(0.1, min(2.0, factor))
+            for coords in keys:
+                brightness_map[coords] = factor
+
+        return brightness_map
     
     def _build_config(self) -> ScreenAmbienceConfig:
         """Constrói ScreenAmbienceConfig a partir do JSON do perfil."""
@@ -240,6 +307,11 @@ class ScreenAmbienceProfile:
         """Define cor para um LED físico individual."""
         row, col = coords
         r, g, b = color
+        r, g, b = self._apply_individual_brightness((r, g, b))
+        factor = self.led_brightness.get(coords, 1.0)
+        r = max(0, min(255, int(r * factor)))
+        g = max(0, min(255, int(g * factor)))
+        b = max(0, min(255, int(b * factor)))
         try:
             self.kb.array_set_single(row, col, r, g, b)
         except Exception as e:
