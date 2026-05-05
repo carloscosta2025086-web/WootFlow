@@ -34,7 +34,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     exclude_binaries=True,
-    icon='assets/Wootflow_icon 256x256.ico',
+    icon='assets/WootFlow_icon_256.ico',
 )
 
 coll = COLLECT(

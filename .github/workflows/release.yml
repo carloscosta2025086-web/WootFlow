@@ -76,26 +76,32 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path .\release -Force | Out-Null
 
-          $appDir = Join-Path $PWD "dist\WootFlow"
+          $tag     = "${{ github.ref_name }}"
+          $appDir  = Join-Path $PWD "dist\WootFlow"
+
           $exe = Get-Item (Join-Path $appDir "WootFlow.exe") -ErrorAction SilentlyContinue
           if (-not $exe) {
-            throw "WootFlow.exe nao encontrado em dist\\WootFlow."
+            throw "WootFlow.exe not found in dist\WootFlow."
           }
 
-          Compress-Archive -Path (Join-Path $appDir '*') -DestinationPath .\release\WootFlow-portable-${{ github.ref_name }}.zip -Force
+          # Portable ZIP  →  WootFlow-v1.2.3-win-portable.zip
+          Compress-Archive -Path (Join-Path $appDir '*') `
+            -DestinationPath ".\release\WootFlow-$tag-win-portable.zip" -Force
 
+          # Installer EXE  →  WootFlow-Setup-v1.2.3-win.exe
           $installer = Get-ChildItem .\installer\output -Filter *.exe | Select-Object -First 1
           if (-not $installer) {
-            throw "Instalador .exe nao encontrado em installer/output/."
+            throw "Installer .exe not found in installer/output/."
           }
+          Copy-Item $installer.FullName ".\release\WootFlow-Setup-$tag-win.exe" -Force
 
-          Copy-Item $installer.FullName .\release\$($installer.Name) -Force
-
-          Get-ChildItem .\release | Format-Table -AutoSize
+          Write-Host "Release assets:"
+          Get-ChildItem .\release | Format-Table Name, Length -AutoSize
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "WootFlow ${{ github.ref_name }}"
           files: |
             release/*
           fail_on_unmatched_files: true

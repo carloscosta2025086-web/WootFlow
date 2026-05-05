@@ -62,6 +62,16 @@ ui/.vite/
 .DS_Store
 Thumbs.db
 
+# -----------------------------
+# Secrets and environment
+# -----------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
 # Keep installer folder structure, ignore generated payloads.
 !installer/output/.gitkeep
 !installer/prereqs/.gitkeep

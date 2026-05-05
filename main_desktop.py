@@ -756,7 +756,7 @@ def main():
 
             # Usa o ícone empacotado no projeto.
             try:
-                icon_path = os.path.join(_RESOURCE_BASE, "assets", "Wootflow_icon 256x256.ico")
+                icon_path = os.path.join(_RESOURCE_BASE, "assets", "WootFlow_icon_256.ico")
                 img = Image.open(icon_path)
             except Exception:
                 img = None
