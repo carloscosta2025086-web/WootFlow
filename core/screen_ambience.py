@@ -212,29 +212,51 @@ class ColorAnalyzer:
         return colors
     
     def _get_dominant_color(self, region: np.ndarray) -> Tuple[int, int, int]:
-        """Extrai cor dominante de uma região."""
-        # Aplicar filtros de cor conforme configuração
-        if self.config.exclude_black:
-            region = region[np.all(region > self.config.black_threshold, axis=2)]
-        if self.config.exclude_white:
-            region = region[np.any(region < self.config.white_threshold, axis=2)]
-        
-        if len(region) == 0:
+        """Extrai cor dominante de uma região usando média ponderada por saturação."""
+        if region.size == 0:
             return (0, 0, 0)
-        
-        # Usar mediana em vez de média para melhor resultado
-        colors_median = np.median(region, axis=0).astype(int)
-        
+
+        # Normalizar para (N, 3)
+        pixels = region.reshape(-1, 3).astype(np.float32)
+
+        # Filtrar pixels negros usando brilho (canal máximo).
+        # Anteriormente usava np.all(canal > threshold) que eliminava pixels
+        # coloridos escuros (ex. roxo escuro R=80, G=15, B=180 → excluído
+        # porque G<30). Agora só exclui se o pixel for realmente escuro em todos
+        # os canais (brightness = max channel).
+        if self.config.exclude_black:
+            brightness = np.max(pixels, axis=1)
+            pixels = pixels[brightness > self.config.black_threshold]
+
+        if self.config.exclude_white:
+            min_ch = np.min(pixels, axis=1)
+            pixels = pixels[min_ch < self.config.white_threshold]
+
+        if len(pixels) == 0:
+            return (0, 0, 0)
+
+        # Peso por saturação: pixels mais vivos (alta saturação) dominam.
+        # Substitui a mediana que desaturava quando a região tinha cores mistas.
+        max_ch = np.max(pixels, axis=1)
+        min_ch_f = np.min(pixels, axis=1)
+        saturation = (max_ch - min_ch_f) / (max_ch + 1e-6)
+        # Base weight de 0.2 garante que regiões neutras (cinzento/branco)
+        # também produzem uma cor em vez de devolver preto.
+        weights = saturation + 0.2
+        total_weight = float(weights.sum())
+
+        weighted = (pixels * weights[:, np.newaxis]).sum(axis=0) / total_weight
+
         # Aplicar sensibilidade de cor
         if self.config.color_sensitivity == "low":
-            colors_median = (colors_median * 0.6).astype(int)
+            weighted = weighted * 0.6
         elif self.config.color_sensitivity == "high":
-            colors_median = np.clip(colors_median * 1.3, 0, 255).astype(int)
-        
+            weighted = np.clip(weighted * 1.4, 0, 255)
+
         # Aplicar brilho global
-        colors_median = np.clip(colors_median * self.config.brightness, 0, 255).astype(int)
-        
-        return tuple(colors_median)
+        weighted = np.clip(weighted * self.config.brightness, 0, 255)
+
+        return tuple(int(c) for c in weighted)
 
 
 class TemporalSmoother:

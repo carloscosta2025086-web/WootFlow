@@ -8,12 +8,29 @@
   "grid_size": 3,
   "color_sensitivity": "medium",
   "brightness": 1.0,
-  "smoothing_factor": 0.7,
+  "smoothing_factor": 0.5,
   "exclude_black": true,
-  "black_threshold": 30,
+  "black_threshold": 15,
   "exclude_white": false,
   "white_threshold": 220,
   "monitor_index": 0,
+  "individual_brightness": {
+    "enabled": true,
+    "min_scale": 0.35,
+    "max_scale": 1.85,
+    "gamma": 0.72
+  },
+  "region_brightness": {
+    "0": 1.0,
+    "1": 1.05,
+    "2": 1.0,
+    "3": 0.95,
+    "4": 1.2,
+    "5": 1.0,
+    "6": 0.9,
+    "7": 1.0,
+    "8": 0.9
+  },
   "zones": [
     {
       "region": 0,
@@ -77,21 +94,21 @@
     "cinematic": {
       "description": "Modo suave para cinema/vídeos",
       "fps": 30,
-      "smoothing_factor": 0.85,
+      "smoothing_factor": 0.65,
       "color_sensitivity": "medium",
       "brightness": 0.9
     },
     "dynamic": {
       "description": "Modo dinâmico para conteúdo variado",
       "fps": 60,
-      "smoothing_factor": 0.6,
+      "smoothing_factor": 0.45,
       "color_sensitivity": "high",
       "brightness": 1.0
     },
     "gaming": {
       "description": "Modo gaming com resposta rápida",
       "fps": 120,
-      "smoothing_factor": 0.4,
+      "smoothing_factor": 0.25,
       "color_sensitivity": "high",
       "brightness": 1.2
     }
