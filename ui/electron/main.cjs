@@ -57,7 +57,7 @@ function createWindow() {
       height: 36,
     },
     backgroundColor: "#0a0a0f",
-    icon: path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'wootflow_icon.ico' : 'wootflow_icon_256x256.png'),
+    icon: path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'WootFlow_icon_256.ico' : 'WootFlow_icon_256.ico'),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

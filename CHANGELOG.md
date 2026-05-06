@@ -1,0 +1,62 @@
+# Changelog
+
+All notable changes to WootFlow are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses [Semantic Versioning](https://semver.org/).
+
+---
+
+## [Unreleased]
+
+---
+
+## [3.2.1] – 2026-05-05
+
+### Fixed
+- Screen ambience zone mapping now auto-fills uncovered LEDs from the 60HE physical layout
+- Tray icon stability improvements on Windows 11
+
+### Changed
+- Build artifacts reorganized: portable ZIP and installer EXE follow consistent `WootFlow-vX.Y.Z-win-*` naming
+
+---
+
+## [3.2.0] – 2026-04-01
+
+### Added
+- Audio reactive effect (pulses keyboard to system audio / music)
+- Screen ambience per-key canvas sampling (SignalRGB-style)
+- Profile system: save and switch multiple lighting profiles
+
+### Changed
+- Migrated frontend to React + Vite + Tailwind CSS
+- Replaced legacy HTTP polling with WebSocket communication
+
+---
+
+## [3.1.0] – 2026-02-15
+
+### Added
+- System tray integration (run in background, right-click menu)
+- Per-key customization panel in UI
+
+### Fixed
+- Wave effect hue drift at high frame rates
+
+---
+
+## [3.0.0] – 2026-01-10
+
+### Added
+- Initial public release
+- Dynamic effects: wave, ripple, reactive typing, fire, aurora, matrix rain, starfield, equalizer, gradient
+- FastAPI backend with WebSocket live control
+- pywebview desktop shell
+- Windows installer via Inno Setup
+- GitHub Actions CI/CD pipeline
+
+[Unreleased]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.2.1...HEAD
+[3.2.1]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.2.0...v3.2.1
+[3.2.0]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.1.0...v3.2.0
+[3.1.0]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/carloscosta2025086-web/WootFlow/releases/tag/v3.0.0
