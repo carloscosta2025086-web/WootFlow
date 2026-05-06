@@ -756,8 +756,17 @@ def main():
 
             # Usa o ícone empacotado no projeto.
             try:
-                icon_path = os.path.join(_RESOURCE_BASE, "assets", "Wootflow_icon 256x256.ico")
-                img = Image.open(icon_path)
+                icon_candidates = [
+                    "WootFlow_icon_256.ico",
+                    "Wootflow_icon 256x256.ico",
+                    "wootflow_icon.ico",
+                ]
+                img = None
+                for icon_name in icon_candidates:
+                    icon_path = os.path.join(_RESOURCE_BASE, "assets", icon_name)
+                    if os.path.exists(icon_path):
+                        img = Image.open(icon_path)
+                        break
             except Exception:
                 img = None
 

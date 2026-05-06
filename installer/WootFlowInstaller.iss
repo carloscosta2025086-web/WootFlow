@@ -12,6 +12,7 @@
 #define MyAppURL "https://github.com/carloscosta2025086-web/WootFlow"
 #define MyAppExeName "WootFlow.exe"
 #define MyAppId "{{B7A6E3A8-4A98-49E2-BAF0-5B4EA52F7D91}"
+#define MyAppIcon "{app}\assets\WootFlow_icon_256.ico"
 
 [Setup]
 AppId={#MyAppId}
@@ -36,7 +37,7 @@ RestartApplications=no
 
 OutputDir={#RepoDir}\installer\output
 OutputBaseFilename=WootFlow-Setup-{#AppVersion}
-UninstallDisplayIcon={app}\assets\Wootflow_icon 256x256.ico
+UninstallDisplayIcon={#MyAppIcon}
 DisableProgramGroupPage=yes
 ChangesEnvironment=no
 
@@ -55,9 +56,9 @@ Source: "{#RepoDir}\installer\prereqs\MicrosoftEdgeWebView2Setup.exe"; DestDir: 
 
 
 [Icons]
-Name: "{group}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\assets\Wootflow_icon 256x256.ico"
-Name: "{group}\Desinstalar WootFlow"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\Wootflow_icon 256x256.ico"
-Name: "{autodesktop}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\assets\Wootflow_icon 256x256.ico"
+Name: "{group}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{#MyAppIcon}"
+Name: "{group}\Desinstalar WootFlow"; Filename: "{uninstallexe}"; IconFilename: "{#MyAppIcon}"
+Name: "{autodesktop}\WootFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{#MyAppIcon}"
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/C taskkill /F /T /IM {#MyAppExeName} >nul 2>nul"; Flags: runhidden waituntilterminated
