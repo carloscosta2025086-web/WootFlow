@@ -2,12 +2,25 @@ interface Props {
   connected: boolean;
   device?: { model: string; layout: string };
   mode: string;
+  autoStartEnabled: boolean;
+  autoStartSupported: boolean;
+  autoStartError?: string;
   send: (data: Record<string, unknown>) => void;
   themeHex: string;
   onThemeChange: (value: string) => void;
 }
 
-export function Settings({ connected, device, mode, send, themeHex, onThemeChange }: Props) {
+export function Settings({
+  connected,
+  device,
+  mode,
+  autoStartEnabled,
+  autoStartSupported,
+  autoStartError,
+  send,
+  themeHex,
+  onThemeChange,
+}: Props) {
   return (
     <div className="wf-settings-grid">
       <div className="wf-settings-head">
@@ -92,11 +105,42 @@ export function Settings({ connected, device, mode, send, themeHex, onThemeChang
         </div>
       </div>
 
+      {/* Auto start */}
+      <div className="wf-card">
+        <h3 className="text-sm font-medium text-gray-300 mb-3">Arranque Automático</h3>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-gray-200">Iniciar WootFlow com o Windows</p>
+            <p className="text-xs text-gray-500">
+              Quando ativo, a app inicia minimizada na tray para continuar os efeitos.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!autoStartSupported}
+            onClick={() => send({ action: "set_auto_start", enabled: !autoStartEnabled })}
+            className={`px-4 py-2 rounded-lg text-sm border transition-all ${
+              autoStartEnabled
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+            } ${!autoStartSupported ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            {autoStartEnabled ? "Ativo" : "Desativado"}
+          </button>
+        </div>
+        {!autoStartSupported && (
+          <p className="text-xs text-amber-300 mt-3">Disponível apenas em Windows.</p>
+        )}
+        {autoStartError && (
+          <p className="text-xs text-red-300 mt-3">Falha ao atualizar auto arranque: {autoStartError}</p>
+        )}
+      </div>
+
       {/* About */}
       <div className="wf-card">
         <h3 className="text-sm font-medium text-gray-300 mb-3">Sobre</h3>
         <div className="space-y-1 text-sm text-gray-500">
-          <p>WootFlow Control v3.2.1</p>
+          <p>WootFlow Control v3.2.2</p>
           <p>Layout: ISO PT 60HE</p>
           <p>Backend: Python + FastAPI + WebSocket</p>
           <p>Frontend: React + Tailwind + pywebview</p>

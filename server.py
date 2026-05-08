@@ -298,6 +298,9 @@ def _resolve_settings_paths() -> tuple[str, list[str]]:
 
 _settings_path, _legacy_settings_paths = _resolve_settings_paths()
 
+_AUTOSTART_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+_AUTOSTART_VALUE_NAME = "WootFlow"
+
 
 def _migrate_legacy_settings_if_needed():
     if os.path.exists(_settings_path):
@@ -338,6 +341,56 @@ def _save_settings(data: dict):
             json.dump(data, f, indent=2)
     except Exception as e:
         log.warning("Could not save settings: %s", e)
+
+
+def _autostart_supported() -> bool:
+    return sys.platform == "win32"
+
+
+def _build_autostart_command() -> str:
+    """Build command line persisted in Windows Run registry key."""
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}" --start-hidden'
+
+    launcher = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main_desktop.py")
+    return f'"{sys.executable}" "{launcher}" --start-hidden'
+
+
+def _read_windows_autostart_status() -> tuple[bool, str | None]:
+    """Return (enabled, error_message)."""
+    if not _autostart_supported():
+        return False, None
+
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_REG_PATH, 0, winreg.KEY_READ) as key:
+            value, _ = winreg.QueryValueEx(key, _AUTOSTART_VALUE_NAME)
+            enabled = bool(str(value).strip())
+            return enabled, None
+    except FileNotFoundError:
+        return False, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _set_windows_autostart(enabled: bool) -> tuple[bool, str | None]:
+    """Return (ok, error_message)."""
+    if not _autostart_supported():
+        return False, "Autostart not supported on this platform"
+
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_REG_PATH) as key:
+            if enabled:
+                winreg.SetValueEx(key, _AUTOSTART_VALUE_NAME, 0, winreg.REG_SZ, _build_autostart_command())
+            else:
+                try:
+                    winreg.DeleteValue(key, _AUTOSTART_VALUE_NAME)
+                except FileNotFoundError:
+                    pass
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
 
 
 # ============================================================================
@@ -393,8 +446,14 @@ class AppState:
         # Screen ambience profile (optional)
         self.screen_ambience = None
 
+        # Auto-start state (Windows only)
+        self.auto_start_enabled = False
+        self.auto_start_supported = _autostart_supported()
+        self.auto_start_error: str | None = None
+
         # Load saved settings
         self._load_user_settings()
+        self.refresh_auto_start_state()
 
     def _load_user_settings(self):
         """Restore settings from disk."""
@@ -409,8 +468,36 @@ class AppState:
         self.liquid_deform = float(s.get("liquid_deform", self.liquid_deform))
         self.current_effect_name = s.get("effect", self.current_effect_name)
         self.mode = s.get("mode", self.mode)
+        self.auto_start_enabled = bool(s.get("auto_start", self.auto_start_enabled))
         log.info("Settings loaded: effect=%s brightness=%.0f%%",
                  self.current_effect_name, self.brightness * 100)
+
+    def refresh_auto_start_state(self):
+        if not self.auto_start_supported:
+            self.auto_start_enabled = False
+            self.auto_start_error = None
+            return
+
+        enabled, err = _read_windows_autostart_status()
+        self.auto_start_enabled = enabled
+        self.auto_start_error = err
+
+    def set_auto_start_enabled(self, enabled: bool) -> bool:
+        if not self.auto_start_supported:
+            self.auto_start_enabled = False
+            self.auto_start_error = "Autostart not supported on this platform"
+            return False
+
+        ok, err = _set_windows_autostart(bool(enabled))
+        self.auto_start_error = err
+        if ok:
+            self.auto_start_enabled = bool(enabled)
+            self.save_settings()
+            return True
+
+        # Keep state aligned with the actual registry state in case of write failure.
+        self.refresh_auto_start_state()
+        return False
 
     def _debug_log(self, message: str, **fields):
         if not self.debug_mode:
@@ -578,6 +665,7 @@ class AppState:
             "liquid_deform": self.liquid_deform,
             "effect": self.current_effect_name,
             "mode": self.mode,
+            "auto_start": self.auto_start_enabled,
         })
 
     def connect_keyboard(self) -> bool:
@@ -839,7 +927,11 @@ class AppState:
             "pynputAvailable": HAS_PYNPUT,
             "capsLock": bool(self.input_caps),
             "debugMode": self.debug_mode,
+            "autoStartEnabled": self.auto_start_enabled,
+            "autoStartSupported": self.auto_start_supported,
         }
+        if self.auto_start_error:
+            d["autoStartError"] = self.auto_start_error
         if self._device_info:
             d["device"] = {
                 "model": self._device_info.get("model", "Unknown"),
@@ -1162,6 +1254,11 @@ async def handle_message(ws: WebSocket, msg: dict):
     elif action == "reconnect":
         state.disconnect_keyboard()
         state.connect_keyboard()
+        await broadcast(state.get_state_dict())
+
+    elif action == "set_auto_start":
+        enabled = bool(msg.get("enabled", False))
+        state.set_auto_start_enabled(enabled)
         await broadcast(state.get_state_dict())
 
     elif action == "reset_perkey":

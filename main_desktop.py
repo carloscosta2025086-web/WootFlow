@@ -670,6 +670,8 @@ def _ensure_ui_is_built():
 
 
 def main():
+    start_hidden = "--start-hidden" in sys.argv
+
     _ensure_windows_prerequisites()
     _ensure_ui_is_built()
 
@@ -688,6 +690,8 @@ def main():
 
     _tray_icon = None
     _tray_thread = None
+    _tray_double_click_window = 0.45
+    _tray_last_open_click = 0.0
 
     # Registar cleanup para qualquer saída do processo
     atexit.register(_cleanup_sdk)
@@ -733,6 +737,108 @@ def main():
         easy_drag=False,
     )
 
+    def _create_tray():
+        nonlocal _tray_icon, _tray_thread, _tray_last_open_click
+        if not HAS_PYSTRAY:
+            return False
+        if _tray_icon is not None:
+            return True
+
+        # Usa o ícone empacotado no projeto.
+        try:
+            icon_candidates = [
+                "WootFlow_icon_256.ico",
+                "Wootflow_icon 256x256.ico",
+                "wootflow_icon.ico",
+            ]
+            img = None
+            for icon_name in icon_candidates:
+                icon_path = os.path.join(_RESOURCE_BASE, "assets", icon_name)
+                if os.path.exists(icon_path):
+                    img = Image.open(icon_path)
+                    break
+        except Exception:
+            img = None
+
+        def _on_open(icon_obj, item):
+            nonlocal _tray_icon, _tray_thread, _tray_last_open_click
+            now = time.monotonic()
+            # Força comportamento de duplo clique: ignora o primeiro clique.
+            if (now - _tray_last_open_click) > _tray_double_click_window:
+                _tray_last_open_click = now
+                return
+            _tray_last_open_click = 0.0
+            try:
+                # Stop tray and restore window
+                try:
+                    icon_obj.stop()
+                except Exception:
+                    pass
+                _tray_icon = None
+                _tray_thread = None
+                window.show()
+                window.restore()
+            except Exception:
+                pass
+
+        def _on_quit(icon_obj, item):
+            nonlocal _tray_icon, _tray_thread
+            try:
+                icon_obj.stop()
+            except Exception:
+                pass
+            _tray_icon = None
+            _tray_thread = None
+            # Cleanup and exit process
+            _cleanup_sdk()
+            try:
+                os._exit(0)
+            except Exception:
+                try:
+                    sys.exit(0)
+                except Exception:
+                    pass
+
+        try:
+            # No Windows, o item default é acionado com duplo clique no ícone da tray.
+            menu = pystray.Menu(
+                pystray.MenuItem("Abrir", _on_open, default=True),
+                pystray.MenuItem("Sair", _on_quit),
+            )
+            _tray_icon = pystray.Icon("wootflow", img, "WootFlow", menu)
+
+            def _run_icon():
+                try:
+                    _tray_icon.run()
+                except Exception as exc:
+                    print(f"[WootFlow] Tray runtime error: {exc}")
+
+            _tray_thread = threading.Thread(target=_run_icon, daemon=True)
+            _tray_thread.start()
+            return True
+        except Exception as exc:
+            print(f"[WootFlow] Failed to create tray icon: {exc}")
+            _tray_icon = None
+            _tray_thread = None
+            return False
+
+    def _hide_to_tray() -> bool:
+        if _create_tray():
+            try:
+                window.hide()
+            except Exception:
+                pass
+            return True
+        return False
+
+    def on_loaded(*_args):
+        if not start_hidden:
+            return
+        _log.info("Startup mode: hidden (requested by --start-hidden)")
+        _hide_to_tray()
+
+    window.events.loaded += on_loaded
+
     def on_closing():
         """Chamado quando a janela está a fechar — minimiza para a tray.
 
@@ -745,101 +851,9 @@ def main():
             _cleanup_sdk()
             return True
 
-        # Janela de tempo para considerar duplo clique no ícone da tray.
-        _tray_double_click_window = 0.45
-        _tray_last_open_click = 0.0
-
-        def _create_tray():
-            nonlocal _tray_icon, _tray_thread
-            if _tray_icon is not None:
-                return True
-
-            # Usa o ícone empacotado no projeto.
-            try:
-                icon_candidates = [
-                    "WootFlow_icon_256.ico",
-                    "Wootflow_icon 256x256.ico",
-                    "wootflow_icon.ico",
-                ]
-                img = None
-                for icon_name in icon_candidates:
-                    icon_path = os.path.join(_RESOURCE_BASE, "assets", icon_name)
-                    if os.path.exists(icon_path):
-                        img = Image.open(icon_path)
-                        break
-            except Exception:
-                img = None
-
-            def _on_open(icon_obj, item):
-                nonlocal _tray_icon, _tray_thread, _tray_last_open_click
-                now = time.monotonic()
-                # Força comportamento de duplo clique: ignora o primeiro clique.
-                if (now - _tray_last_open_click) > _tray_double_click_window:
-                    _tray_last_open_click = now
-                    return
-                _tray_last_open_click = 0.0
-                try:
-                    # Stop tray and restore window
-                    try:
-                        icon_obj.stop()
-                    except Exception:
-                        pass
-                    _tray_icon = None
-                    _tray_thread = None
-                    window.show()
-                    window.restore()
-                except Exception:
-                    pass
-
-            def _on_quit(icon_obj, item):
-                nonlocal _tray_icon, _tray_thread
-                try:
-                    icon_obj.stop()
-                except Exception:
-                    pass
-                _tray_icon = None
-                _tray_thread = None
-                # Cleanup and exit process
-                _cleanup_sdk()
-                import os, sys
-                try:
-                    os._exit(0)
-                except Exception:
-                    try:
-                        sys.exit(0)
-                    except Exception:
-                        pass
-
-            try:
-                # No Windows, o item default é acionado com duplo clique no ícone da tray.
-                menu = pystray.Menu(
-                    pystray.MenuItem("Abrir", _on_open, default=True),
-                    pystray.MenuItem("Sair", _on_quit),
-                )
-                _tray_icon = pystray.Icon("wootflow", img, "WootFlow", menu)
-
-                def _run_icon():
-                    try:
-                        _tray_icon.run()
-                    except Exception as exc:
-                        print(f"[WootFlow] Tray runtime error: {exc}")
-
-                _tray_thread = threading.Thread(target=_run_icon, daemon=True)
-                _tray_thread.start()
-                return True
-            except Exception as exc:
-                print(f"[WootFlow] Failed to create tray icon: {exc}")
-                _tray_icon = None
-                _tray_thread = None
-                return False
-
         # Só esconder/cancelar fecho quando a tray existir de facto.
         try:
-            if _create_tray():
-                try:
-                    window.hide()
-                except Exception:
-                    pass
+            if _hide_to_tray():
                 return False
             _cleanup_sdk()
             return True

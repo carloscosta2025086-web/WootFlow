@@ -16,6 +16,9 @@ export interface AppState {
   _sensitivity?: number;
   _smoothing?: number;
   pynputAvailable: boolean;
+  autoStartEnabled?: boolean;
+  autoStartSupported?: boolean;
+  autoStartError?: string;
   device?: {
     model: string;
     layout: string;

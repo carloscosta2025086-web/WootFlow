@@ -117,6 +117,9 @@ export default function App() {
               connected={state.connected}
               device={state.device}
               mode={state.mode}
+              autoStartEnabled={Boolean(state.autoStartEnabled)}
+              autoStartSupported={Boolean(state.autoStartSupported)}
+              autoStartError={state.autoStartError}
               send={send}
               themeHex={themeHex}
               onThemeChange={setThemeHex}
