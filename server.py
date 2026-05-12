@@ -83,6 +83,7 @@ except Exception:
 # VK fica como fallback quando o scancode não está disponível.
 
 ACTIVE_KEYS = set(ALL_KEYS)
+SPACE_LED_KEYS = [(5, 4), (5, 5), (5, 6), (5, 7), (5, 8)]
 
 SCANCODE_TO_SDK = {
     # Row 1
@@ -270,6 +271,19 @@ def _get_key_pos(key) -> tuple[int, int] | None:
     if mapped in ACTIVE_KEYS:
         return mapped
     return None
+
+
+def _is_space_key_event(key, pos: tuple[int, int] | None) -> bool:
+    """Deteta Space de forma robusta para expandir para os 5 LEDs."""
+    if pos == (5, 6):
+        return True
+
+    sc = _get_scancode(key)
+    if sc == 0x39:
+        return True
+
+    vk = _get_vk(key)
+    return vk == 0x20
 
 
 # ============================================================================
@@ -660,9 +674,13 @@ class AppState:
             pos = _get_key_pos(key)
             if pos is None:
                 return
-            row, col = pos
             if self.current_effect and hasattr(self.current_effect, "trigger"):
-                self.current_effect.trigger(row, col)
+                if _is_space_key_event(key, pos):
+                    for row, col in SPACE_LED_KEYS:
+                        self.current_effect.trigger(row, col)
+                else:
+                    row, col = pos
+                    self.current_effect.trigger(row, col)
 
         def on_release(key):
             return None

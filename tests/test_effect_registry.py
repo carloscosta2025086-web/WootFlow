@@ -4,6 +4,8 @@ from core.effect_registry import EFFECT_LABELS, EFFECT_REGISTRY, get_effect_clas
 def test_registry_has_core_effects():
     assert "breathing" in EFFECT_REGISTRY
     assert "breathing" in EFFECT_LABELS
+    assert "tracers" in EFFECT_REGISTRY
+    assert "tracers" in EFFECT_LABELS
 
 
 def test_registry_returns_effect_class():

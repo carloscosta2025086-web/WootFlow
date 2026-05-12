@@ -12,7 +12,7 @@ const CATEGORIES: Record<string, string[]> = {
   "Estáticas": ["solid_color", "gradient"],
   "Ondas": ["rainbow_wave", "color_wave", "ocean", "aurora", "liquid_flow"],
   "Pulso": ["breathing", "spectrum_cycle", "heartbeat"],
-  "Reativas": ["reactive_typing", "ripple", "magnetic_keys", "jello"],
+  "Reativas": ["reactive_typing", "ripple", "magnetic_keys", "jello", "tracers"],
   "Partículas": ["raindrop", "sparkle", "starfield", "matrix_rain"],
   "Ambiente": ["fire", "lava", "screen_ambience"],
 };

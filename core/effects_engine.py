@@ -80,6 +80,7 @@ PHYSICAL_KEYS_60HE = [
 ]
 
 ALL_KEYS = [(r, c) for row in PHYSICAL_KEYS_60HE for r, c in row]
+ALL_KEYS_SET = set(ALL_KEYS)
 
 
 # ============================================================================
@@ -844,6 +845,116 @@ class JelloEffect(Effect):
         kb.array_update()
 
 
+class TracersEffect(Effect):
+    """Liga teclas com traços rápidos e persistentes; Space limpa tudo."""
+    name = "Tracers"
+
+    def __init__(self):
+        super().__init__()
+        self.speed = 1.0
+        self.color1 = (0, 255, 200)
+        self.color2 = (255, 80, 40)
+        self._bg = (4, 4, 10)
+        self._trace_seconds = 0.14
+        self._max_points = 48
+        self._max_segments = 96
+        self._clear_keys = {(5, 4), (5, 5), (5, 6), (5, 7), (5, 8)} # Space 5 LEDS
+        self._points = []      # [(row, col)]
+        self._segments = []    # [{"keys": [...], "start": float}]
+        self._lock = threading.Lock()
+
+    def _line_keys(self, start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
+        """Bresenham discreto para desenhar linha entre duas teclas."""
+        r0, c0 = start
+        r1, c1 = end
+        dr = abs(r1 - r0)
+        dc = abs(c1 - c0)
+        sr = 1 if r0 < r1 else -1
+        sc = 1 if c0 < c1 else -1
+
+        keys = []
+        if dc > dr:
+            err = dc / 2
+            while c0 != c1:
+                if (r0, c0) in ALL_KEYS_SET:
+                    keys.append((r0, c0))
+                err -= dr
+                if err < 0:
+                    r0 += sr
+                    err += dc
+                c0 += sc
+        else:
+            err = dr / 2
+            while r0 != r1:
+                if (r0, c0) in ALL_KEYS_SET:
+                    keys.append((r0, c0))
+                err -= dc
+                if err < 0:
+                    c0 += sc
+                    err += dr
+                r0 += sr
+
+        if (r1, c1) in ALL_KEYS_SET:
+            keys.append((r1, c1))
+        return keys
+
+    def trigger(self, row: int, col: int):
+        with self._lock:
+            if (row, col) in self._clear_keys:
+                self._points.clear()
+                self._segments.clear()
+                return
+
+            new_point = (row, col)
+            if self._points:
+                prev = self._points[-1]
+                if prev != new_point:
+                    self._segments.append({
+                        "keys": self._line_keys(prev, new_point),
+                        "start": time.time(),
+                    })
+                    if len(self._segments) > self._max_segments:
+                        self._segments = self._segments[-self._max_segments:]
+
+            self._points.append(new_point)
+            if len(self._points) > self._max_points:
+                self._points = self._points[-self._max_points:]
+
+    def update(self, kb: WootFlowRGB, t: float):
+        with self._lock:
+            points = list(self._points)
+            segments = [
+                {
+                    "keys": list(seg["keys"]),
+                    "start": float(seg["start"]),
+                }
+                for seg in self._segments
+            ]
+
+        for row, col in ALL_KEYS:
+            kb.array_set_single(row, col, *self._bg)
+
+        trace_duration = max(0.035, self._trace_seconds / max(0.2, self.speed))
+        for seg in segments:
+            line = seg["keys"]
+            if not line:
+                continue
+
+            age = max(0.0, t - seg["start"])
+            progress = max(0.0, min(1.0, age / trace_duration))
+            draw_n = max(1, int(math.ceil(len(line) * progress)))
+
+            tr, tg, tb = scale_color(self.color2, self.brightness)
+            for row, col in line[:draw_n]:
+                kb.array_set_single(row, col, tr, tg, tb)
+
+        pr, pg, pb = scale_color(self.color1, self.brightness)
+        for row, col in points:
+            kb.array_set_single(row, col, pr, pg, pb)
+
+        kb.array_update()
+
+
 # ============================================================================
 # Equalizer: mapa de colunas físicas e cor por altura
 # ============================================================================
@@ -953,6 +1064,7 @@ EFFECTS = {
     "liquid_flow": LiquidFlowEffect,
     "magnetic_keys": MagneticKeysEffect,
     "jello": JelloEffect,
+    "tracers": TracersEffect,
 }
 
 EFFECT_NAMES = {
@@ -976,4 +1088,5 @@ EFFECT_NAMES = {
     "liquid_flow": "Liquid Flow",
     "magnetic_keys": "Magnetic Keys",
     "jello": "Jello",
+    "tracers": "Tracers",
 }
