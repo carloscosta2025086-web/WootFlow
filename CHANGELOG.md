@@ -10,6 +10,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## [3.2.3] - 2026-05-08
+
+### Added
+- Auto arranque no Windows com toggle em Definicoes
+
+### Changed
+- Quando iniciado por auto arranque, o app abre minimizado para a tray (`--start-hidden`)
+
+### Fixed
+- Estado de auto arranque sincronizado entre registo do Windows e painel de Definicoes
+
+---
+
 ## [3.2.1] – 2026-05-05
 
 ### Fixed
@@ -55,7 +68,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Windows installer via Inno Setup
 - GitHub Actions CI/CD pipeline
 
-[Unreleased]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.2.1...HEAD
+[Unreleased]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.2.3...HEAD
+[3.2.3]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.2.2...v3.2.3
 [3.2.1]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/carloscosta2025086-web/WootFlow/compare/v3.0.0...v3.1.0
