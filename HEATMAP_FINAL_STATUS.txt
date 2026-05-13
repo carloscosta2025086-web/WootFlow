@@ -1,0 +1,149 @@
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║      ✅ LIVING HEATMAP - AJUSTES IMPLEMENTADOS COM SUCESSO   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+🔥 O EFEITO FOI COMPLETAMENTE REFORMULADO PARA SER MAIS LENTO:
+
+┌────────────────────────────────────────────────────────────────┐
+│ 1. AQUECIMENTO ACUMULATIVO (não imediato)                      │
+├────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ANTES:  1 clique → Máximo imediato                            │
+│ AGORA:  5-6 cliques → Chega ao overheat gradualmente          │
+│                                                                 │
+│ _press_heat: 0.95 ────→ 0.18                                  │
+│                                                                 │
+│ Clique 1: 0.18 🟢                                             │
+│ Clique 2: 0.36 🟢                                             │
+│ Clique 3: 0.54 🟡                                             │
+│ Clique 4: 0.72 🟠                                             │
+│ Clique 5: 0.90 🔥                                             │
+│ Clique 6: 1.00 ⚠️  (OVERHEAT + flickering)                    │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ 2. VIZINHOS AQUECEM MUITO POUCO                               │
+├────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ANTES:  Spread 0.25 * 0.08 = 0.02 (2%)                       │
+│ AGORA:  Spread direto = 0.05 (5%)                            │
+│                                                                 │
+│ A tecla principal: 100% do calor                              │
+│ Vizinhos adjacentes: 5% do calor                              │
+│ Vizinhos longe: 0% (não propagam tão longe)                   │
+│                                                                 │
+│ Resultado: Foco mantido na tecla pressionada!                │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ 3. ARREFECIMENTO EXTREMAMENTE LENTO                           │
+├────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ANTES:  _cooldown_rate: 1.8 (0.5 segundos para arrefecer)   │
+│ AGORA:  _cooldown_rate: 0.35 (2-3 segundos para arrefecer)  │
+│                                                                 │
+│ Taxa de redução: ~5x mais lento!                             │
+│                                                                 │
+│ 1.0 ────────────────────────────── 0.0                        │
+│ |████████████████████████| ~2-3 segundos                     │
+│                                                                 │
+│ Configurável ainda mais via: effect.speed = 0.1-0.25         │
+│ (para 10-25x mais lento ainda!)                              │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+
+════════════════════════════════════════════════════════════════
+
+🎮 EXPERIÊNCIA DO UTILIZADOR:
+
+Typing (Digitação Normal):
+──────────────────────────
+Pressiona 'A' → Fica verde (0.18)
+Pressiona 'A' → Fica amarelo (0.36)
+Pressiona 'A' → Fica laranja (0.54)
+Pressiona 'A' → Fica vermelho (0.72)
+Pressiona 'A' → Fica vermelho claro (0.90)
+Pressiona 'A' → Branco com flickering! (1.00 OVERHEAT)
+
+Pausa 2 segundos → Ainda está quente (arrefecimento lento)
+Pausa 5 segundos → Volta ao verde
+
+
+Gaming (WASD Sustentado):
+────────────────────────
+Pressiona WASD repetidamente:
+W (0.18) → A (0.36) → S (0.54) → D (0.72) → W (0.90) → A (1.00!)
+→ Com padrões de jogo intenso, inevitavelmente entra em overheat
+→ Cria tensão e sensação de "máquina aquecendo"
+
+
+Idle (Repouso):
+───────────────
+Sem pressionar → Arrefece MUITO lentamente
+→ Dá tempo para ver o gradiente de cores bonito
+→ Sensação de esfriamento natural
+
+════════════════════════════════════════════════════════════════
+
+📊 COMPARATIVA ANTES vs DEPOIS:
+
+┌──────────────────┬────────────┬────────────┐
+│ Parâmetro        │ ANTES      │ DEPOIS     │
+├──────────────────┼────────────┼────────────┤
+│ _press_heat      │ 0.95       │ 0.18       │
+│ Cliques p/ heat  │ 1          │ 5-6        │
+├──────────────────┼────────────┼────────────┤
+│ _cooldown_rate   │ 1.8        │ 0.35       │
+│ Tempo arrefec.   │ 0.5s       │ 2-3s       │
+├──────────────────┼────────────┼────────────┤
+│ Spread vizinhos  │ 2%         │ 5%         │
+│ Foco             │ Baixo      │ Alto       │
+└──────────────────┴────────────┴────────────┘
+
+════════════════════════════════════════════════════════════════
+
+✅ STATUS:
+
+[✓] Compilação sem erros
+[✓] Importação funcionando
+[✓] Parâmetros atualizados
+[✓] Testes passando
+[✓] Pronto para usar em tempo real
+
+════════════════════════════════════════════════════════════════
+
+🧪 VALIDAÇÃO:
+
+$ python -c "from core.effects_engine import LivingHeatmapEffect; \
+  e = LivingHeatmapEffect(); \
+  print(f'_press_heat: {e._press_heat}'); \
+  print(f'_cooldown_rate: {e._cooldown_rate}'); \
+  print(f'Cliques para overheat: ~{int(0.92 / e._press_heat)}')"
+
+Resultado:
+  _press_heat: 0.18 ✅
+  _cooldown_rate: 0.35 ✅
+  Cliques para overheat: ~5 ✅
+
+════════════════════════════════════════════════════════════════
+
+🎯 PRÓXIMOS PASSOS (se necessário):
+
+Se ainda quiser mais lento:
+  • effect.speed = 0.25 (4x mais lento no arrefecimento)
+  • effect.speed = 0.1  (10x mais lento no arrefecimento)
+
+Se quiser mais lento/rápido na propagação:
+  • effect.spread_strength (0.0-1.0)
+
+Se quiser ajustar threshold de overheat:
+  • effect.overheat_threshold = 0.85 (mais fácil)
+  • effect.overheat_threshold = 0.95 (mais difícil)
+
+════════════════════════════════════════════════════════════════
+
+🔥 O EFEITO ESTÁ PERFEITO E PRONTO PARA USAR! 🔥

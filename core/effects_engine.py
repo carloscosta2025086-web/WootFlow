@@ -955,6 +955,161 @@ class TracersEffect(Effect):
         kb.array_update()
 
 
+class LivingHeatmapEffect(Effect):
+    """
+    Efeito Living Heatmap — teclas aquecem gradualmente com cliques repetidos.
+    
+    Comportamento:
+    - Cada clique adiciona +0.02 (precisa de ~50 cliques para máximo 1.0)
+    - Cores: Verde Escuro → Amarelo → Laranja → Vermelho → Branco
+    - Vizinhos aquecem 50% mais devagar (metade do valor da tecla principal)
+    - Após 0.5s sem cliques, começa arrefecimento lento
+    - Arrefecimento afeta tanto tecla principal como vizinhos
+    """
+    name = "Living Heatmap"
+
+    def __init__(self):
+        super().__init__()
+        self.speed = 1.0  # controla velocidade de arrefecimento
+        
+        # Matriz de temperatura: [row][col] = 0.0 a 1.0
+        self._temperature = [[0.0] * 21 for _ in range(6)]
+        # Matriz de último tempo pressionado (para delay antes de arrefecer)
+        self._last_press_time = [[0.0] * 21 for _ in range(6)]
+        self._lock = threading.Lock()
+        
+        # Parâmetros de física
+        self._press_heat = 0.02  # +0.02 por clique (50 cliques = 1.0)
+        self._cooldown_delay = 0.5  # aguarda 0.5s antes de arrefecer
+        self._cooldown_rate = 0.15  # velocidade de arrefecimento (0.15/seg)
+        self._neighbor_factor = 0.5  # vizinhos aquecem 50% (metade)
+
+    def trigger(self, row: int, col: int):
+        """Registra uma tecla pressionada — incrementa temperatura."""
+        if 0 <= row < 6 and 0 <= col < 21:
+            with self._lock:
+                current_time = time.time()
+                self._temperature[row][col] = min(
+                    1.0,
+                    self._temperature[row][col] + self._press_heat
+                )
+                # Registar tempo do pressionamento (para delay antes de arrefecer)
+                self._last_press_time[row][col] = current_time
+                
+                # Também aquecer vizinhos, mas 50% mais devagar
+                neighbors = self._get_neighbors(row, col)
+                for nr, nc in neighbors:
+                    self._temperature[nr][nc] = min(
+                        1.0,
+                        self._temperature[nr][nc] + self._press_heat * self._neighbor_factor
+                    )
+
+    def _get_neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
+        """Retorna teclas vizinhas (8 direções + diagonais)."""
+        neighbors = []
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = row + dr, col + dc
+                if 0 <= nr < 6 and 0 <= nc < 21 and (nr, nc) in ALL_KEYS_SET:
+                    neighbors.append((nr, nc))
+        return neighbors
+
+    def _temperature_to_color(self, temp: float) -> tuple[int, int, int]:
+        """Mapeia temperatura para cor com transição suave.
+        
+        0.0 → Verde escuro (5, 80, 20)
+        0.25 → Amarelo (255, 220, 0)
+        0.5 → Laranja (255, 140, 0)
+        0.75 → Vermelho (255, 40, 0)
+        1.0 → Branco (255, 255, 255)
+        """
+        temp = max(0.0, min(1.0, temp))
+        
+        if temp == 0.0:
+            # Verde escuro (inativo)
+            return (5, 80, 20)
+        elif temp < 0.25:
+            # Verde escuro → Amarelo (0.0-0.25)
+            t = temp / 0.25
+            r = int(5 + (255 - 5) * t)
+            g = int(80 + (220 - 80) * t)
+            b = int(20 + (0 - 20) * t)
+        elif temp < 0.5:
+            # Amarelo → Laranja (0.25-0.5)
+            t = (temp - 0.25) / 0.25
+            r = 255
+            g = int(220 + (140 - 220) * t)
+            b = int(0 + (0 - 0) * t)
+        elif temp < 0.75:
+            # Laranja → Vermelho (0.5-0.75)
+            t = (temp - 0.5) / 0.25
+            r = 255
+            g = int(140 + (40 - 140) * t)
+            b = int(0 + (0 - 0) * t)
+        else:
+            # Vermelho → Branco (0.75-1.0)
+            t = (temp - 0.75) / 0.25
+            r = int(255 + (255 - 255) * t)
+            g = int(40 + (255 - 40) * t)
+            b = int(0 + (255 - 0) * t)
+        
+        # Flicker leve no estado quente (>0.8)
+        if temp > 0.8:
+            flicker = 0.85 + 0.15 * math.sin(time.time() * 12.0)
+            r = min(255, int(r * flicker))
+            g = min(255, int(g * flicker))
+            b = min(255, int(b * flicker))
+        
+        return (r, g, b)
+
+    def update(self, kb: WootFlowRGB, t: float):
+        """Atualiza o efeito: arrefecimento após delay e renderização."""
+        dt = 1.0 / 60.0  # assume 60fps
+        
+        with self._lock:
+            current_time = t
+            
+            # Arrefecimento gradual (apenas se passou 0.5s sem cliques)
+            for row in range(6):
+                for col in range(21):
+                    if (row, col) not in ALL_KEYS_SET:
+                        continue
+                    
+                    time_since_press = current_time - self._last_press_time[row][col]
+                    
+                    # Só arrefece se passou 0.5s sem cliques
+                    if time_since_press >= self._cooldown_delay:
+                        cooldown_speed = self._cooldown_rate * self.speed * dt
+                        self._temperature[row][col] = max(
+                            0.0,
+                            self._temperature[row][col] - cooldown_speed
+                        )
+            
+            temps = [row[:] for row in self._temperature]
+        
+        # Renderização
+        for row, col in ALL_KEYS:
+            temp = temps[row][col]
+            
+            # Cor baseada na temperatura
+            r, g, b = self._temperature_to_color(temp)
+            
+            # Glow dinâmico: mais brilho conforme aumenta temperatura
+            glow_factor = 0.3 + 0.7 * temp  # 0.3 a 1.0
+            glow_factor *= self.brightness
+            
+            # Aplicar glow
+            r = min(255, int(r * glow_factor))
+            g = min(255, int(g * glow_factor))
+            b = min(255, int(b * glow_factor))
+            
+            kb.array_set_single(row, col, r, g, b)
+        
+        kb.array_update()
+
+
 # ============================================================================
 # Equalizer: mapa de colunas físicas e cor por altura
 # ============================================================================
@@ -1065,6 +1220,7 @@ EFFECTS = {
     "magnetic_keys": MagneticKeysEffect,
     "jello": JelloEffect,
     "tracers": TracersEffect,
+    "living_heatmap": LivingHeatmapEffect,
 }
 
 EFFECT_NAMES = {
@@ -1089,4 +1245,5 @@ EFFECT_NAMES = {
     "magnetic_keys": "Magnetic Keys",
     "jello": "Jello",
     "tracers": "Tracers",
+    "living_heatmap": "Living Heatmap",
 }
